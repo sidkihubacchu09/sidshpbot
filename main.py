@@ -11,9 +11,10 @@ from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, P
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # HOSTING BOT CREDENTIALS
-BOT_TOKEN = os.getenv("8212227179:AAHN--mUKViMf48inExMWBCk7VnO3wwOpvk", "YOUR_BOT_TOKEN_HERE")
-MANAGER_API_ID = int(os.getenv("38843772", "1234567"))
-MANAGER_API_HASH = os.getenv("875fbb273801c8025d05e98173fca536", "your_manager_api_hash_here")
+# Dynamically reads from your Railway Environment Variables
+BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
+MANAGER_API_ID = int(os.getenv("MANAGER_API_ID", "1234567"))
+MANAGER_API_HASH = os.getenv("MANAGER_API_HASH", "your_manager_api_hash_here")
 
 # Tracks pipeline states per user
 runtime_states = {}
@@ -32,7 +33,7 @@ def extract_credentials_from_text(text):
     
     # Matches patterns like API_ID = 123456 or API_ID="123456" or api_id=123456
     id_match = re.search(r'(?:API_ID)\s*=\s*[\'"]?(\d+)[\'"]?', text, re.IGNORECASE)
-    hash_match = re.search(r'(?:API_HASH)\s*=\s*[\'"]?([a-fA-max0-9]{32})[\'"]?', text, re.IGNORECASE)
+    hash_match = re.search(r'(?:API_HASH)\s*=\s*[\'"]?([a-fA-Z0-9a-f]{32})[\'"]?', text, re.IGNORECASE)
     
     if id_match:
         api_id = id_match.group(1)

@@ -49,57 +49,40 @@ def keep_alive():
 # --- End Flask Keep Alive ---
 
 # --- Configuration ---
-# It is highly recommended to use environment variables in Railway instead of hardcoding tokens.
-TOKEN = os.getenv("BOT_TOKEN", '8212227179:AAHN--mUKViMf48inExMWBCk7VnO3wwOpvk') 
+TOKEN = os.getenv("8637135798:AAEdTzCnL3fn1keuLzLxQN0BUULXlTMicVY", '') 
 OWNER_ID = int(os.getenv("OWNER_ID", "2119464081"))
 ADMIN_ID = int(os.getenv("ADMIN_ID", "2119464081"))
 YOUR_USERNAME = '@Xricx0' 
 UPDATE_CHANNEL = 'https://t.me/+5uCnxp3U1gMwZjQ1'
 
-# Folder setup - using absolute paths
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_BOTS_DIR = os.path.join(BASE_DIR, 'upload_bots')
 IROTECH_DIR = os.path.join(BASE_DIR, 'inf')
 DATABASE_PATH = os.path.join(IROTECH_DIR, 'bot_data.db')
 
-# File upload limits
 FREE_USER_LIMIT = 10
 SUBSCRIBED_USER_LIMIT = 15
 ADMIN_LIMIT = 999
 OWNER_LIMIT = float('inf')
 
-# Create necessary directories
 os.makedirs(UPLOAD_BOTS_DIR, exist_ok=True)
 os.makedirs(IROTECH_DIR, exist_ok=True)
 
-# Initialize bot
 bot = telebot.TeleBot(TOKEN)
 
-# --- Data structures ---
 bot_scripts = {}
 user_subscriptions = {}
 user_files = {}
 active_users = set()
 admin_ids = {ADMIN_ID, OWNER_ID}
 bot_locked = False
-userbot_auth_sessions = {} # Tracks Userbot login states
-
-# --- Malware Detection Configuration ---
-MALWARE_SIGNATURES = [
-    b'MZ', b'\x7fELF', b'\xfe\xed\xfa', b'\xce\xfa\xed\xfe', b'PK', b'Rar!',
-]
-ENCRYPTED_FILE_INDICATORS = [
-    b'openssl', b'encrypted', b'cipher', b'AES', b'DES', b'RSA', b'GPG', b'PGP',
-]
-SUSPICIOUS_KEYWORDS = [
-    b'ransomware', b'trojan', b'virus', b'malware', b'backdoor', b'exploit', b'payload', b'botnet', b'keylogger', b'rootkit',
-]
+userbot_auth_sessions = {}
 
 # --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- Command Button Layouts (ReplyKeyboardMarkup) ---
+# --- Command Button Layouts ---
 COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
     ["📢 Updates Channel"],
     ["📤 Upload File", "📂 Check Files"],
@@ -118,7 +101,6 @@ ADMIN_COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
 
 # --- Database Setup ---
 def init_db():
-    logger.info(f"Initializing database at: {DATABASE_PATH}")
     try:
         conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
         c = conn.cursor()
@@ -132,10 +114,9 @@ def init_db():
         conn.commit()
         conn.close()
     except Exception as e:
-        logger.error(f"❌ Database initialization error: {e}", exc_info=True)
+        logger.error(f"❌ Database error: {e}")
 
 def load_data():
-    logger.info("Loading data from database...")
     try:
         conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
         c = conn.cursor()
@@ -153,47 +134,10 @@ def load_data():
         admin_ids.update(user_id for (user_id,) in c.fetchall())
         conn.close()
     except Exception as e:
-        logger.error(f"❌ Error loading data: {e}", exc_info=True)
+        logger.error(f"❌ Error loading data: {e}")
 
 init_db()
 load_data()
-
-# --- Malware Detection Functions ---
-def get_file_type(file_content):
-    signatures = {
-        b'\x7fELF': 'application/x-executable', b'MZ': 'application/x-dosexec',
-        b'\xfe\xed\xfa': 'application/x-mach-binary', b'\xce\xfa\xed\xfe': 'application/x-mach-binary',
-        b'PK': 'application/zip', b'Rar!': 'application/x-rar',
-    }
-    for signature, mime_type in signatures.items():
-        if file_content.startswith(signature): return mime_type
-    return 'application/octet-stream'
-
-def is_suspicious_file(file_content, file_name):
-    file_lower = file_name.lower()
-    suspicious_extensions = ['.exe', '.dll', '.bat', '.cmd', '.scr', '.com', '.pif', '.application', '.gadget', '.msi', '.msp', '.hta', '.cpl', '.msc', '.jar', '.bin', '.deb', '.rpm', '.apk', '.app', '.dmg', '.iso', '.img']
-    if any(file_lower.endswith(ext) for ext in suspicious_extensions): return True, f"Suspicious file extension: {file_name}"
-    for signature in MALWARE_SIGNATURES:
-        if file_content.startswith(signature): return True, f"Malware signature detected: {signature}"
-    sample_size = min(len(file_content), 4096)
-    file_sample = file_content[:sample_size]
-    for indicator in ENCRYPTED_FILE_INDICATORS:
-        if indicator in file_sample: return True, f"Encrypted file indicator: {indicator.decode('utf-8', errors='ignore')}"
-    sample_text = file_sample.decode('utf-8', errors='ignore').lower()
-    for keyword in SUSPICIOUS_KEYWORDS:
-        if keyword.decode('utf-8').lower() in sample_text: return True, f"Suspicious keyword found: {keyword.decode('utf-8')}"
-    try:
-        file_type = get_file_type(file_sample)
-        if file_type in ['application/x-dosexec', 'application/x-executable', 'application/x-mach-binary']:
-            return True, f"Executable file type detected: {file_type}"
-    except Exception: pass
-    return False, "File appears safe"
-
-def scan_file_for_malware(file_content, file_name, user_id):
-    if user_id == OWNER_ID: return True, "Owner bypassed security check"
-    is_suspicious, reason = is_suspicious_file(file_content, file_name)
-    if is_suspicious: return False, f"Security violation: {reason}"
-    return True, "File passed security check"
 
 # --- Helper Functions ---
 def get_user_folder(user_id):
@@ -217,22 +161,15 @@ def is_bot_running(script_owner_id, file_name):
             proc = psutil.Process(script_info['process'].pid)
             is_running = proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE
             if not is_running:
-                if 'log_file' in script_info and hasattr(script_info['log_file'], 'close') and not script_info['log_file'].closed:
-                    try: script_info['log_file'].close()
-                    except: pass
                 if script_key in bot_scripts: del bot_scripts[script_key]
             return is_running
         except psutil.NoSuchProcess:
-            if 'log_file' in script_info and hasattr(script_info['log_file'], 'close') and not script_info['log_file'].closed:
-                try: script_info['log_file'].close()
-                except: pass
             if script_key in bot_scripts: del bot_scripts[script_key]
             return False
     return False
 
 def kill_process_tree(process_info):
     pid = None
-    script_key = process_info.get('script_key', 'N/A')
     try:
         if 'log_file' in process_info and hasattr(process_info['log_file'], 'close') and not process_info['log_file'].closed:
             try: process_info['log_file'].close()
@@ -249,27 +186,12 @@ def kill_process_tree(process_info):
                 try: parent.kill()
                 except: pass
             except psutil.NoSuchProcess: pass
-    except Exception as e: logger.error(f"❌ Unexpected error killing process tree for PID {pid or 'N/A'} ({script_key}): {e}")
-
-def attempt_install_pip(module_name, message):
-    try:
-        bot.reply_to(message, f"🐍 Module `{module_name}` not found. Installing...", parse_mode='Markdown')
-        command = [sys.executable, '-m', 'pip', 'install', module_name]
-        result = subprocess.run(command, capture_output=True, text=True, check=False, encoding='utf-8', errors='ignore')
-        if result.returncode == 0:
-            bot.reply_to(message, f"✅ Package `{module_name}` installed.", parse_mode='Markdown')
-            return True
-        else:
-            bot.reply_to(message, f"❌ Failed to install `{module_name}`.", parse_mode='Markdown')
-            return False
-    except Exception as e:
-        bot.reply_to(message, f"❌ Error installing `{module_name}`: {str(e)}")
-        return False
+    except Exception as e: logger.error(f"❌ Error killing PID {pid}: {e}")
 
 # --- Script Runners ---
 def run_script(script_path, script_owner_id, user_folder, file_name, message_obj_for_reply, attempt=1, extra_args=None):
     if attempt > 2:
-        bot.reply_to(message_obj_for_reply, f"❌ Failed to run '{file_name}' after 2 attempts.")
+        bot.reply_to(message_obj_for_reply, f"❌ Failed to run '{file_name}'.")
         return
     script_key = f"{script_owner_id}_{file_name}"
     try:
@@ -281,8 +203,7 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
         log_file = open(log_file_path, 'w', encoding='utf-8', errors='ignore')
         
         command = [sys.executable, script_path]
-        if extra_args:
-            command.extend(extra_args)
+        if extra_args: command.extend(extra_args)
 
         process = subprocess.Popen(command, cwd=user_folder, stdout=log_file, stderr=log_file, stdin=subprocess.PIPE, encoding='utf-8', errors='ignore')
         
@@ -293,20 +214,14 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
         }
         bot.reply_to(message_obj_for_reply, f"✅ Python script '{file_name}' started! (PID: {process.pid})")
     except Exception as e:
-        bot.reply_to(message_obj_for_reply, f"❌ Unexpected error running Python script '{file_name}': {str(e)}")
+        bot.reply_to(message_obj_for_reply, f"❌ Unexpected error running script: {str(e)}")
         if script_key in bot_scripts:
              kill_process_tree(bot_scripts[script_key])
              del bot_scripts[script_key]
 
 def run_js_script(script_path, script_owner_id, user_folder, file_name, message_obj_for_reply, attempt=1):
-    if attempt > 2:
-        bot.reply_to(message_obj_for_reply, f"❌ Failed to run '{file_name}'.")
-        return
     script_key = f"{script_owner_id}_{file_name}"
     try:
-        if not os.path.exists(script_path):
-             bot.reply_to(message_obj_for_reply, f"❌ Error: Script '{file_name}' not found!")
-             return
         log_file_path = os.path.join(user_folder, f"{os.path.splitext(file_name)[0]}.log")
         log_file = open(log_file_path, 'w', encoding='utf-8', errors='ignore')
         process = subprocess.Popen(['node', script_path], cwd=user_folder, stdout=log_file, stderr=log_file, stdin=subprocess.PIPE, encoding='utf-8', errors='ignore')
@@ -317,10 +232,7 @@ def run_js_script(script_path, script_owner_id, user_folder, file_name, message_
         }
         bot.reply_to(message_obj_for_reply, f"✅ JS script '{file_name}' started! (PID: {process.pid})")
     except Exception as e:
-        bot.reply_to(message_obj_for_reply, f"❌ Unexpected error running JS script '{file_name}': {str(e)}")
-        if script_key in bot_scripts:
-             kill_process_tree(bot_scripts[script_key])
-             del bot_scripts[script_key]
+        bot.reply_to(message_obj_for_reply, f"❌ Error running JS script: {str(e)}")
 
 # --- Database Operations ---
 DB_LOCK = threading.Lock() 
@@ -334,7 +246,7 @@ def save_user_file(user_id, file_name, file_type='py'):
             if user_id not in user_files: user_files[user_id] = []
             user_files[user_id] = [(fn, ft) for fn, ft in user_files[user_id] if fn != file_name]
             user_files[user_id].append((file_name, file_type))
-        except sqlite3.Error as e: logger.error(f"❌ SQLite error saving file for user {user_id}, {file_name}: {e}")
+        except sqlite3.Error as e: logger.error(f"❌ DB error: {e}")
         finally: conn.close()
 
 def remove_user_file_db(user_id, file_name):
@@ -347,7 +259,7 @@ def remove_user_file_db(user_id, file_name):
             if user_id in user_files:
                 user_files[user_id] = [f for f in user_files[user_id] if f[0] != file_name]
                 if not user_files[user_id]: del user_files[user_id]
-        except sqlite3.Error as e: logger.error(f"❌ SQLite error removing file for {user_id}, {file_name}: {e}")
+        except sqlite3.Error as e: logger.error(f"❌ DB error: {e}")
         finally: conn.close()
 
 def add_active_user(user_id):
@@ -362,40 +274,6 @@ def add_active_user(user_id):
         finally: conn.close()
 
 # --- Menu Creation ---
-def create_main_menu_inline(user_id):
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    buttons = [
-        types.InlineKeyboardButton('📢 Updates Channel', url=UPDATE_CHANNEL),
-        types.InlineKeyboardButton('📤 Upload File', callback_data='upload'),
-        types.InlineKeyboardButton('📂 Check Files', callback_data='check_files'),
-        types.InlineKeyboardButton('⚡ Bot Speed', callback_data='speed'),
-        types.InlineKeyboardButton('📤 Send Command', callback_data='send_command'),
-        types.InlineKeyboardButton('📞 Contact Owner', url=f'https://t.me/{YOUR_USERNAME.replace("@", "")}')
-    ]
-    if user_id in admin_ids:
-        admin_buttons = [
-            types.InlineKeyboardButton('💳 Subscriptions', callback_data='subscription'),
-            types.InlineKeyboardButton('📊 Statistics', callback_data='stats'),
-            types.InlineKeyboardButton('🔒 Lock Bot' if not bot_locked else '🔓 Unlock Bot', callback_data='lock_bot' if not bot_locked else 'unlock_bot'),
-            types.InlineKeyboardButton('📢 Broadcast', callback_data='broadcast'),
-            types.InlineKeyboardButton('👑 Admin Panel', callback_data='admin_panel'),
-            types.InlineKeyboardButton('🟢 Run All User Scripts', callback_data='run_all_scripts')
-        ]
-        markup.add(buttons[0])
-        markup.add(buttons[1], buttons[2])
-        markup.add(buttons[3], admin_buttons[0])
-        markup.add(admin_buttons[1], admin_buttons[3])
-        markup.add(admin_buttons[2], admin_buttons[5])
-        markup.add(buttons[4], admin_buttons[4])
-        markup.add(buttons[5])
-    else:
-        markup.add(buttons[0])
-        markup.add(buttons[1], buttons[2])
-        markup.add(buttons[3], buttons[4])
-        markup.add(types.InlineKeyboardButton('📊 Statistics', callback_data='stats'))
-        markup.add(buttons[5])
-    return markup
-
 def create_reply_keyboard_main_menu(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     layout_to_use = ADMIN_COMMAND_BUTTONS_LAYOUT_USER_SPEC if user_id in admin_ids else COMMAND_BUTTONS_LAYOUT_USER_SPEC
@@ -406,28 +284,18 @@ def create_reply_keyboard_main_menu(user_id):
 def create_control_buttons(script_owner_id, file_name, is_running=True):
     markup = types.InlineKeyboardMarkup(row_width=2)
     if is_running:
-        markup.row(
-            types.InlineKeyboardButton("🔴 Stop", callback_data=f'stop_{script_owner_id}_{file_name}'),
-            types.InlineKeyboardButton("🔄 Restart", callback_data=f'restart_{script_owner_id}_{file_name}')
-        )
-        markup.row(
-            types.InlineKeyboardButton("🗑️ Delete", callback_data=f'delete_{script_owner_id}_{file_name}'),
-            types.InlineKeyboardButton("📜 Logs", callback_data=f'logs_{script_owner_id}_{file_name}')
-        )
+        markup.row(types.InlineKeyboardButton("🔴 Stop", callback_data=f'stop_{script_owner_id}_{file_name}'),
+                   types.InlineKeyboardButton("🔄 Restart", callback_data=f'restart_{script_owner_id}_{file_name}'))
+        markup.row(types.InlineKeyboardButton("🗑️ Delete", callback_data=f'delete_{script_owner_id}_{file_name}'),
+                   types.InlineKeyboardButton("📜 Logs", callback_data=f'logs_{script_owner_id}_{file_name}'))
     else:
-        markup.row(
-            types.InlineKeyboardButton("🟢 Start", callback_data=f'start_{script_owner_id}_{file_name}'),
-            types.InlineKeyboardButton("🗑️ Delete", callback_data=f'delete_{script_owner_id}_{file_name}')
-        )
+        markup.row(types.InlineKeyboardButton("🟢 Start", callback_data=f'start_{script_owner_id}_{file_name}'),
+                   types.InlineKeyboardButton("🗑️ Delete", callback_data=f'delete_{script_owner_id}_{file_name}'))
         markup.row(types.InlineKeyboardButton("📜 View Logs", callback_data=f'logs_{script_owner_id}_{file_name}'))
-    markup.add(types.InlineKeyboardButton("🔙 Back to Files", callback_data='check_files'))
     return markup
 
-
 # --- USERBOT DEPLOYMENT LOGIC BEGIN ---
-
 def extract_credentials_from_text(text):
-    """Scan code for API configurations to detect Userbots."""
     api_id, api_hash = None, None
     id_match = re.search(r'(?:API_ID)\s*=\s*[\'"]?(\d+)[\'"]?', text, re.IGNORECASE)
     hash_match = re.search(r'(?:API_HASH)\s*=\s*[\'"]?([a-fA-F0-9]{32})[\'"]?', text, re.IGNORECASE)
@@ -436,7 +304,6 @@ def extract_credentials_from_text(text):
     return api_id, api_hash
 
 async def _async_send_code(session_name, api_id, api_hash, phone):
-    """Asynchronous worker for sending OTP via Telethon"""
     client = TelegramClient(session_name, int(api_id), api_hash)
     await client.connect()
     send_code = await client.send_code_request(phone)
@@ -444,59 +311,40 @@ async def _async_send_code(session_name, api_id, api_hash, phone):
     return send_code.phone_code_hash
 
 async def _async_sign_in(session_name, api_id, api_hash, phone, code, phone_code_hash, password=None):
-    """Asynchronous worker for completing Telethon sign in"""
     client = TelegramClient(session_name, int(api_id), api_hash)
     await client.connect()
-    if password:
-        await client.sign_in(password=password)
-    else:
-        await client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
+    if password: await client.sign_in(password=password)
+    else: await client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
     await client.disconnect()
 
 def process_userbot_phone(message, script_path, api_id, api_hash, file_name, user_folder):
-    """Step 1: Process User's Phone Number"""
     phone = message.text.strip()
     user_id = message.from_user.id
-    
     if not phone.startswith('+') or not phone[1:].isdigit():
         bot.reply_to(message, "❌ **Format Error:** Use E.164 format (`+XXXXXXXXXXX`). Setup aborted.", parse_mode='Markdown')
         return
-
     wait_msg = bot.reply_to(message, "⏳ **Negotiating secure verification...**", parse_mode='Markdown')
     session_name = os.path.join(user_folder, f"temp_session_{user_id}")
-    
     try:
-        # Run Telethon in isolated event loop
         phone_code_hash = asyncio.run(_async_send_code(session_name, api_id, api_hash, phone))
-        
         userbot_auth_sessions[user_id] = {
             "session_name": session_name, "api_id": api_id, "api_hash": api_hash,
             "phone": phone, "phone_code_hash": phone_code_hash,
             "script_path": script_path, "file_name": file_name, "user_folder": user_folder
         }
-        
-        msg = bot.edit_message_text(
-            "📩 **OTP Sent!**\n\n👉 Check your official Telegram app and reply with the OTP code:", 
-            message.chat.id, wait_msg.message_id, parse_mode='Markdown'
-        )
+        msg = bot.edit_message_text("📩 **OTP Sent!**\n\n👉 Reply with the OTP code:", message.chat.id, wait_msg.message_id, parse_mode='Markdown')
         bot.register_next_step_handler(msg, process_userbot_otp)
     except Exception as e:
         bot.edit_message_text(f"❌ **Handshake Aborted:** `{e}`", message.chat.id, wait_msg.message_id, parse_mode='Markdown')
 
 def process_userbot_otp(message):
-    """Step 2: Process Telegram OTP"""
     user_id = message.from_user.id
     if user_id not in userbot_auth_sessions: return
-    
     state = userbot_auth_sessions[user_id]
     otp_code = message.text.replace(" ", "")
     wait_msg = bot.reply_to(message, "🔐 **Validating session...**", parse_mode='Markdown')
-    
     try:
-        asyncio.run(_async_sign_in(
-            state["session_name"], state["api_id"], state["api_hash"], 
-            state["phone"], otp_code, state["phone_code_hash"]
-        ))
+        asyncio.run(_async_sign_in(state["session_name"], state["api_id"], state["api_hash"], state["phone"], otp_code, state["phone_code_hash"]))
         finalize_userbot_deployment(message, wait_msg.message_id, state)
     except PhoneCodeInvalidError:
         msg = bot.edit_message_text("❌ **Invalid OTP.** Reply with the correct code:", message.chat.id, wait_msg.message_id, parse_mode='Markdown')
@@ -509,19 +357,13 @@ def process_userbot_otp(message):
         del userbot_auth_sessions[user_id]
 
 def process_userbot_2fa(message):
-    """Step 3: Process 2FA Password if needed"""
     user_id = message.from_user.id
     if user_id not in userbot_auth_sessions: return
-    
     state = userbot_auth_sessions[user_id]
     password = message.text.strip()
     wait_msg = bot.reply_to(message, "🔐 **Verifying 2FA...**", parse_mode='Markdown')
-    
     try:
-        asyncio.run(_async_sign_in(
-            state["session_name"], state["api_id"], state["api_hash"], 
-            state["phone"], None, None, password=password
-        ))
+        asyncio.run(_async_sign_in(state["session_name"], state["api_id"], state["api_hash"], state["phone"], None, None, password=password))
         finalize_userbot_deployment(message, wait_msg.message_id, state)
     except PasswordHashInvalidError:
         msg = bot.edit_message_text("❌ **Incorrect password.** Try again:", message.chat.id, wait_msg.message_id, parse_mode='Markdown')
@@ -531,48 +373,105 @@ def process_userbot_2fa(message):
         del userbot_auth_sessions[user_id]
 
 def finalize_userbot_deployment(message, wait_msg_id, state):
-    """Final Step: Finalize Session and Run Process"""
     user_id = message.from_user.id
-    
     old_session_file = f"{state['session_name']}.session"
     final_session_name = os.path.join(state['user_folder'], f"user_session_{user_id}")
     final_session_file = f"{final_session_name}.session"
     
     if os.path.exists(old_session_file):
-        if os.path.exists(final_session_file):
-            os.remove(final_session_file)
+        if os.path.exists(final_session_file): os.remove(final_session_file)
         os.rename(old_session_file, final_session_file)
 
-    bot.edit_message_text(
-        f"✅ **Session Saved!**\nInstantiating Userbot `{state['file_name']}`...", 
-        message.chat.id, wait_msg_id, parse_mode='Markdown'
-    )
-    
+    bot.edit_message_text(f"✅ **Session Saved!**\nInstantiating Userbot `{state['file_name']}`...", message.chat.id, wait_msg_id, parse_mode='Markdown')
     save_user_file(user_id, state['file_name'], 'py')
     
-    # Run the script, injecting the required arguments for userbots
     extra_args = [final_session_name, str(state["api_id"]), state["api_hash"], str(user_id)]
     threading.Thread(target=run_script, args=(state['script_path'], user_id, state['user_folder'], state['file_name'], message, 1, extra_args)).start()
-    
     del userbot_auth_sessions[user_id]
 
-# --- USERBOT DEPLOYMENT LOGIC END ---
+# --- ZIP Handling ---
+def handle_zip_file(downloaded_file_content, file_name_zip, message):
+    user_id = message.from_user.id
+    user_folder = get_user_folder(user_id)
+    temp_dir = tempfile.mkdtemp(prefix=f"user_{user_id}_zip_")
+    
+    try:
+        zip_path = os.path.join(temp_dir, file_name_zip)
+        with open(zip_path, 'wb') as new_file:
+            new_file.write(downloaded_file_content)
+        
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(temp_dir)
 
+        target_dir = temp_dir
+        for root, dirs, files in os.walk(temp_dir):
+            dirs[:] = [d for d in dirs if not d.startswith('.') and not d.startswith('__')]
+            if any(f.endswith(('.py', '.js')) for f in files):
+                target_dir = root
+                break
+        
+        if target_dir != temp_dir:
+            for item in os.listdir(target_dir):
+                s = os.path.join(target_dir, item)
+                d = os.path.join(temp_dir, item)
+                if os.path.exists(d):
+                    if os.path.isdir(d): shutil.rmtree(d)
+                    else: os.remove(d)
+                shutil.move(s, d)
+        
+        extracted_items = os.listdir(temp_dir)
+        py_files = [f for f in extracted_items if f.endswith('.py')]
+        js_files = [f for f in extracted_items if f.endswith('.js')]
+        req_file = 'requirements.txt' if 'requirements.txt' in extracted_items else None
 
-# --- File Handling with Malware Detection ---
+        if req_file:
+            req_path = os.path.join(temp_dir, req_file)
+            bot.reply_to(message, f"🔄 Installing Python deps from `{req_file}`...")
+            subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', req_path], capture_output=True, check=False)
+
+        main_script_name = None; file_type = None
+        preferred_py = ['main.py', 'bot.py', 'app.py']
+        for p in preferred_py:
+            if p in py_files: main_script_name = p; file_type = 'py'; break
+        if not main_script_name and py_files: main_script_name = py_files[0]; file_type = 'py'
+        if not main_script_name and js_files: main_script_name = js_files[0]; file_type = 'js'
+
+        if not main_script_name:
+            bot.reply_to(message, "❌ No `.py` or `.js` script found in archive!"); return
+
+        for item_name in os.listdir(temp_dir):
+            if item_name == file_name_zip: continue 
+            src_path = os.path.join(temp_dir, item_name)
+            dest_path = os.path.join(user_folder, item_name)
+            if os.path.isdir(dest_path): shutil.rmtree(dest_path)
+            elif os.path.exists(dest_path): os.remove(dest_path)
+            shutil.move(src_path, dest_path)
+
+        save_user_file(user_id, main_script_name, file_type)
+        main_script_path = os.path.join(user_folder, main_script_name)
+        bot.reply_to(message, f"✅ Files extracted. Starting main script: `{main_script_name}`...", parse_mode='Markdown')
+
+        if file_type == 'py':
+             threading.Thread(target=run_script, args=(main_script_path, user_id, user_folder, main_script_name, message)).start()
+        elif file_type == 'js':
+             threading.Thread(target=run_js_script, args=(main_script_path, user_id, user_folder, main_script_name, message)).start()
+
+    except Exception as e:
+        bot.reply_to(message, f"❌ Error processing zip: {str(e)}")
+    finally:
+        if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
+
+# --- File Handling ---
 @bot.message_handler(content_types=['document'])
 def handle_file_upload_doc(message):
     user_id = message.from_user.id
-    chat_id = message.chat.id
     doc = message.document
 
     if bot_locked and user_id not in admin_ids:
         bot.reply_to(message, "⚠️ Bot locked, cannot accept files.")
         return
 
-    file_limit = get_user_file_limit(user_id)
-    current_files = get_user_file_count(user_id)
-    if current_files >= file_limit:
+    if get_user_file_count(user_id) >= get_user_file_limit(user_id):
         bot.reply_to(message, f"⚠️ File limit reached. Delete files via /checkfiles.")
         return
 
@@ -589,18 +488,11 @@ def handle_file_upload_doc(message):
         file_info_tg_doc = bot.get_file(doc.file_id)
         downloaded_file_content = bot.download_file(file_info_tg_doc.file_path)
         
-        if user_id != OWNER_ID:
-            is_safe, reason = scan_file_for_malware(downloaded_file_content, file_name, user_id)
-            if not is_safe:
-                bot.edit_message_text(f"🚨 Security Alert: {reason}", chat_id, download_wait_msg.message_id)
-                return
-        
-        bot.edit_message_text(f"✅ Downloaded `{file_name}`. Processing...", chat_id, download_wait_msg.message_id)
+        bot.edit_message_text(f"✅ Downloaded `{file_name}`. Processing...", message.chat.id, download_wait_msg.message_id)
         user_folder = get_user_folder(user_id)
 
         if file_ext == '.zip':
-            # Handling Zip (Skipped implementation logic to save space, assuming it's standard)
-            bot.reply_to(message, "Zip handling requires full implementation.")
+            handle_zip_file(downloaded_file_content, file_name, message)
         else:
             file_path = os.path.join(user_folder, file_name)
             with open(file_path, 'wb') as f: f.write(downloaded_file_content)
@@ -609,7 +501,6 @@ def handle_file_upload_doc(message):
                 save_user_file(user_id, file_name, 'js')
                 threading.Thread(target=run_js_script, args=(file_path, user_id, user_folder, file_name, message)).start()
             elif file_ext == '.py': 
-                # --- INTEGRATING USERBOT CHECK HERE ---
                 try:
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                         script_content = f.read()
@@ -632,9 +523,9 @@ def handle_file_upload_doc(message):
     except Exception as e:
         bot.reply_to(message, f"❌ Unexpected error: {str(e)}")
 
-# --- Command & Logic Handlers ---
-@bot.message_handler(commands=['start', 'help'])
-def command_send_welcome(message):
+
+# --- Button Logic Handlers ---
+def _logic_send_welcome(message):
     user_id = message.from_user.id
     if user_id not in active_users: add_active_user(user_id)
     welcome_msg_text = (f"〽️ Welcome!\n\n🆔 Your User ID: `{user_id}`\n"
@@ -644,8 +535,7 @@ def command_send_welcome(message):
     main_reply_markup = create_reply_keyboard_main_menu(user_id)
     bot.send_message(message.chat.id, welcome_msg_text, reply_markup=main_reply_markup, parse_mode='Markdown')
 
-@bot.message_handler(commands=['checkfiles'])
-def command_check_files(message):
+def _logic_check_files(message):
     user_id = message.from_user.id
     user_files_list = user_files.get(user_id, [])
     if not user_files_list:
@@ -658,6 +548,40 @@ def command_check_files(message):
         btn_text = f"{file_name} ({file_type}) - {status_icon}"
         markup.add(types.InlineKeyboardButton(btn_text, callback_data=f'file_{user_id}_{file_name}'))
     bot.reply_to(message, "📂 Your files:\nClick to manage.", reply_markup=markup, parse_mode='Markdown')
+
+def _logic_upload_file(message):
+    bot.reply_to(message, "📤 Send your Python (`.py`), JS (`.js`), or ZIP (`.zip`) file.")
+
+def _logic_bot_speed(message):
+    start_time = time.time()
+    msg = bot.reply_to(message, "🏃 Testing speed...")
+    latency = round((time.time() - start_time) * 1000, 2)
+    bot.edit_message_text(f"⚡ Bot Speed:\n\n⏱️ Response Time: {latency} ms", message.chat.id, msg.message_id)
+
+def _logic_statistics(message):
+    total_users = len(active_users)
+    bot.reply_to(message, f"📊 Bot Statistics:\n\n👥 Total Users: {total_users}")
+
+# --- Command Routing ---
+BUTTON_TEXT_TO_LOGIC = {
+    "📢 Updates Channel": lambda m: bot.reply_to(m, f"Visit our Updates Channel: {UPDATE_CHANNEL}"),
+    "📤 Upload File": _logic_upload_file,
+    "📂 Check Files": _logic_check_files,
+    "⚡ Bot Speed": _logic_bot_speed,
+    "📊 Statistics": _logic_statistics,
+    "📞 Contact Owner": lambda m: bot.reply_to(m, f"Contact: {YOUR_USERNAME}")
+}
+
+@bot.message_handler(commands=['start', 'help'])
+def command_start(message): _logic_send_welcome(message)
+
+@bot.message_handler(commands=['checkfiles'])
+def command_files(message): _logic_check_files(message)
+
+@bot.message_handler(func=lambda message: message.text in BUTTON_TEXT_TO_LOGIC)
+def handle_button_text(message):
+    logic_func = BUTTON_TEXT_TO_LOGIC.get(message.text)
+    if logic_func: logic_func(message)
 
 # --- Inline Callbacks ---
 @bot.callback_query_handler(func=lambda call: True) 
@@ -689,8 +613,18 @@ def handle_callbacks(call):
         file_path = os.path.join(user_folder, file_name)
         threading.Thread(target=run_script, args=(file_path, int(script_owner_id_str), user_folder, file_name, call.message)).start()
         bot.answer_callback_query(call.id, "Starting script...")
+    elif data.startswith('delete_'):
+        _, script_owner_id_str, file_name = call.data.split('_', 2)
+        script_owner_id = int(script_owner_id_str)
+        script_key = f"{script_owner_id}_{file_name}"
+        if script_key in bot_scripts:
+            kill_process_tree(bot_scripts[script_key])
+            del bot_scripts[script_key]
+        remove_user_file_db(script_owner_id, file_name)
+        bot.answer_callback_query(call.id, "File deleted.")
+        bot.edit_message_text("File deleted successfully.", call.message.chat.id, call.message.message_id)
     elif data == 'check_files':
-        command_check_files(call.message)
+        _logic_check_files(call.message)
     else:
         bot.answer_callback_query(call.id, "Action processed.")
 

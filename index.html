@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Userbot Deployer Dashboard</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            margin: 0; padding: 16px; box-sizing: border-box;
+        }
+        .step-container { display: none; }
+        .step-container.active { display: block; }
+        .card {
+            background-color: var(--tg-theme-secondary-bg-color, #f1f5f9);
+            border-radius: 12px; padding: 16px; margin-bottom: 16px;
+        }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+        input[type="text"], input[type="file"] {
+            width: 100%; padding: 12px; border-radius: 8px;
+            border: 1px solid #cbd5e1; box-sizing: border-box;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+        }
+        .btn {
+            width: 100%; padding: 14px; border: none; border-radius: 8px;
+            font-size: 16px; font-weight: bold; cursor: pointer;
+            background-color: var(--tg-theme-button-color, #0088cc);
+            color: var(--tg-theme-button-text-color, #ffffff);
+        }
+        .status-msg { color: #e11d48; font-size: 14px; margin-top: 8px; font-weight: 500; }
+    </style>
+</head>
+<body>
+
+    <!-- STEP 1: SCRIPT UPLOAD -->
+    <div id="step-upload" class="step-container active">
+        <h2>🛠️ Step 1: Upload Script</h2>
+        <div class="card">
+            <p>Upload your userbot script (`.py`). The engine will auto-detect your credentials.</p>
+            <div class="form-group">
+                <input type="file" id="scriptFile" accept=".py">
+            </div>
+            <button class="btn" onclick="uploadScript()">Process Script</button>
+            <div id="upload-status" class="status-msg"></div>
+        </div>
+    </div>
+
+    <!-- STEP 2: PHONE INPUT -->
+    <div id="step-phone" class="step-container">
+        <h2>📱 Step 2: Authentication</h2>
+        <div class="card">
+            <div class="form-group">
+                <label>Phone Number (International Notation)</label>
+                <input type="text" id="phoneNum" placeholder="+1234567890">
+            </div>
+            <button class="btn" onclick="submitPhone()">Send Verification Code</button>
+            <div id="phone-status" class="status-msg"></div>
+        </div>
+    </div>
+
+    <!-- STEP 3: OTP VERIFICATION -->
+    <div id="step-otp" class="step-container">
+        <h2>🔐 Step 3: Enter OTP</h2>
+        <div class="card">
+            <div class="form-group">
+                <label>Telegram Verification Code</label>
+                <input type="text" id="otpCode" placeholder="Enter code received in Telegram">
+            </div>
+            <button class="btn" onclick="submitOtp()">Verify Token</button>
+            <div id="otp-status" class="status-msg"></div>
+        </div>
+    </div>
+
+    <!-- STEP 4: 2FA CHALLENGE -->
+    <div id="step-2fa" class="step-container">
+        <h2>🛡️ Two-Factor Password</h2>
+        <div class="card">
+            <div class="form-group">
+                <label>Cloud 2FA Password</label>
+                <input type="text" id="password2fa" placeholder="Enter your 2FA password">
+            </div>
+            <button class="btn" onclick="submit2fa()">Authenticate Engine</button>
+            <div id="2fa-status" class="status-msg"></div>
+        </div>
+    </div>
+
+    <!-- STEP 5: DEPLOYMENT COMPLETE -->
+    <div id="step-success" class="step-container">
+        <div class="card" style="text-align: center;">
+            <h2>🚀 Engine Thread Online</h2>
+            <p>Your custom daemon has been successfully generated inside an isolated framework node.</p>
+            <button class="btn" style="background-color: #22c55e;" onclick="window.Telegram.WebApp.close()">Done</button>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        // Fallback user ID determination via official WebApp API
+        const uid = tg.initDataUnsafe?.user?.id || "DEBUG_USER";
+
+        function showStep(stepId) {
+            document.querySelectorAll('.step-container').forEach(el => el.classList.remove('active'));
+            document.getElementById(stepId).classList.add('active');
+        }
+
+        async function uploadScript() {
+            const fileInput = document.getElementById('scriptFile');
+            const status = document.getElementById('upload-status');
+            if (!fileInput.files[0]) return status.innerText = "Please choose a file.";
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('uid', uid);
+
+            status.innerText = "Processing server alignment...";
+            const res = await fetch('/api/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (data.success) {
+                showStep('step-phone');
+            } else {
+                status.innerText = data.error;
+            }
+        }
+
+        async function submitPhone() {
+            const phone = document.getElementById('phoneNum').value;
+            const status = document.getElementById('phone-status');
+            
+            const res = await fetch('/api/phone', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid, phone })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                showStep('step-otp');
+            } else {
+                status.innerText = data.error;
+            }
+        }
+
+        async function submitOtp() {
+            const code = document.getElementById('otpCode').value;
+            const status = document.getElementById('otp-status');
+
+            const res = await fetch('/api/otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid, code })
+            });
+            const data = await res.json();
+
+            if (data.success && data.deployed) {
+                showStep('step-success');
+            } else if (data.success && data.requires_2fa) {
+                showStep('step-2fa');
+            } else {
+                status.innerText = data.error;
+            }
+        }
+
+        async function submit2fa() {
+            const password = document.getElementById('password2fa').value;
+            const status = document.getElementById('2fa-status');
+
+            const res = await fetch('/api/2fa', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid, password })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                showStep('step-success');
+            } else {
+                status.innerText = data.error;
+            }
+        }
+    </script>
+</body>
+</html>

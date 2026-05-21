@@ -4,6 +4,8 @@ import subprocess
 import sys
 import logging
 import re
+import importlib.util
+from aiohttp import web
 from telethon import TelegramClient, events, Button
 from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, PasswordHashInvalidError
 
@@ -43,6 +45,16 @@ def extract_credentials_from_text(text):
     return api_id, api_hash
 
 
+# --- WEB SERVER HANDLERS ---
+async def handle_index(request):
+    """Serves the index.html Web App dashboard file when the Railway URL is accessed."""
+    try:
+        return web.FileResponse('./index.html')
+    except FileNotFoundError:
+        return web.Response(text="index.html not found in project root folder.", status=404)
+
+
+# --- TELEGRAM BOT EVENT LOGIC ---
 @manager_bot.on(events.NewMessage(pattern='/start'))
 async def start_cmd(event):
     uid = event.sender_id
@@ -227,7 +239,7 @@ async def deploy_custom_runtime(event, uid, state):
     user_api_id = state["api_id"]
     user_api_hash = state["api_hash"]
     
-    await event.reply("🛡️ **Signature Validated.** Instantiating isolated dynamic engine thread...")
+    await event.reply("🛡️ **Signature Validated.** Merging dynamic runtime into master async event loop...")
     await client.disconnect()
     
     old_session = f"auth_temp_{uid}.session"
@@ -239,20 +251,30 @@ async def deploy_custom_runtime(event, uid, state):
         os.rename(old_session, new_session + ".session")
         
     try:
-        # Launching script in background via dynamic sys.argv array
-        subprocess.Popen(
-            [sys.executable, script_path, new_session, str(user_api_id), user_api_hash, str(uid)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
+        # Re-initialize the active user client cleanly inside the main process memory footprint
+        live_userbot = TelegramClient(new_session, int(user_api_id), user_api_hash)
+        await live_userbot.connect()
+        
+        # Load the uploaded userbot code dynamically into python module memory space
+        spec = importlib.util.spec_from_file_location(f"dynamic_mod_{uid}", script_path)
+        user_module = importlib.util.module_from_spec(spec)
+        
+        # Inject the active live_userbot client straight into their module execution context
+        user_module.client = live_userbot 
+        
+        # Execute the module code
+        spec.loader.exec_module(user_module)
+        
+        # Schedule the new userbot client to start up asynchronously alongside your manager bot
+        asyncio.create_task(live_userbot.start())
         
         success_message = f"""🚀 **DYNAMIC DAEMON RUNTIME ONLINE** 🚀
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✨ **System Status:** `RUNNING (Isolated Core Node)`
+✨ **System Status:** `RUNNING (Unified Core Loop)`
 📂 **Active Package Target:** `{os.path.basename(script_path)}`
 🔐 **Session Allocation ID:** `{new_session}`
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🌟 **Deployment Finished!** You can now open any private or channel chat within your personal account and trigger commands directly."""
+🌟 **Deployment Finished!** Your userbot events have been hot-plugged directly into the engine room successfully."""
         
         dashboard_buttons = [
             [
@@ -265,16 +287,34 @@ async def deploy_custom_runtime(event, uid, state):
         await event.reply(success_message, buttons=dashboard_buttons)
         
     except Exception as e:
-        await event.reply(f"❌ **Process Core Allocation Fault:** Cloud micro-container generation failed: `{e}`")
+        await event.reply(f"❌ **Process Core Allocation Fault:** Cloud memory injection failed: `{e}`")
         
     if uid in runtime_states:
         del runtime_states[uid]
 
 
+# --- MAIN ASYNC ENGINE LOOP ---
 async def main():
+    # Start Telegram Client Manager Bot
     await manager_bot.start(bot_token=BOT_TOKEN)
-    print("--- Dynamic Script Cloud Host Manager Running ---")
+    
+    # Configure Web Server Layer
+    app = web.Application()
+    app.router.add_get('/', handle_index)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    
+    # Pull dynamic port assigned by Railway
+    port = int(os.getenv("PORT", "8080"))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    
+    print(f"--- Web App Application Layer active on port {port} ---")
+    print(f"--- Dynamic Script Cloud Host Manager Bot Running ---")
+    
     await manager_bot.run_until_disconnected()
+
 
 if __name__ == '__main__':
     asyncio.run(main())

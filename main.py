@@ -50,7 +50,7 @@ def keep_alive():
 
 # --- Configuration ---
 # It is highly recommended to use environment variables in Railway instead of hardcoding tokens.
-TOKEN = os.getenv("BOT_TOKEN", '6248614957:AAGWzd37KASqv6u3OZRxt3gPaqkkdpmRNHg') 
+TOKEN = os.getenv("BOT_TOKEN", '') 
 OWNER_ID = int(os.getenv("OWNER_ID", "2119464081"))
 ADMIN_ID = int(os.getenv("ADMIN_ID", "2119464081"))
 YOUR_USERNAME = '@Xricx0' 

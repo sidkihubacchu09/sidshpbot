@@ -8,6 +8,11 @@ import asyncio
 from telethon import TelegramClient, events
 from telethon.errors.rpcerrorlist import MessageNotModifiedError
 
+# Web App imports
+import uvicorn
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ⚙️ SECURE CREDENTIAL LOADER (Railway Dashboard)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -27,11 +32,107 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s ⚡ %(message)s', da
 # Initialize client cleanly as a Telegram Bot Engine
 client = TelegramClient('vizard_bot_session', int(API_ID), API_HASH)
 
+# Initialize FastAPI App
+app = FastAPI(title="Vizard Bot Dashboard")
+
 # --- Global Variables ---
 start_time = time.time()
 
 # ==========================================
-#        ✨ ATTRACTIVE BOT COMMANDS ✨
+#         🌐 WEB APPLICATION LAYER
+# ==========================================
+
+@app.get("/", response_class=HTMLResponse)
+async def dashboard():
+    uptime = round(time.time() - start_time)
+    minutes, seconds = divmod(uptime, 60)
+    hours, minutes = divmod(minutes, 60)
+    uptime_str = f"{hours}h {minutes}m {seconds}s"
+    
+    cpu = psutil.cpu_percent(interval=None)
+    ram = psutil.virtual_memory().percent
+    
+    # Modern dark-mode HTML dashboard
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Vizard Bot Dashboard</title>
+        <style>
+            body {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background-color: #0e1118;
+                color: #ffffff;
+                margin: 0;
+                padding: 0;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+            }}
+            .card {{
+                background: #161b26;
+                padding: 30px;
+                border-radius: 15px;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+                border: 1px solid #232d3f;
+                max-width: 400px;
+                width: 100%;
+                text-align: center;
+            }}
+            h1 {{ color: #00e676; margin-bottom: 5px; font-size: 24px; letter-spacing: 2px; }}
+            .subtitle {{ color: #8a99ad; font-size: 14px; margin-bottom: 25px; }}
+            .metric {{
+                display: flex;
+                justify-content: space-between;
+                padding: 12px 0;
+                border-bottom: 1px solid #232d3f;
+            }}
+            .metric:last-child {{ border: none; }}
+            .label {{ color: #8a99ad; font-weight: 500; }}
+            .value {{ font-family: 'Courier New', Courier, monospace; color: #00b0ff; font-weight: bold; }}
+            .status-online {{ color: #00e676; font-weight: bold; }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <h1>🤖 VIZARD BOT </h1>
+            <div class="subtitle">Production Control Panel</div>
+            <div class="metric">
+                <span class="label">Status:</span>
+                <span class="value status-online">Systems Online</span>
+            </div>
+            <div class="metric">
+                <span class="label">Uptime:</span>
+                <span class="value">{uptime_str}</span>
+            </div>
+            <div class="metric">
+                <span class="label">CPU Load:</span>
+                <span class="value">{cpu}%</span>
+            </div>
+            <div class="metric">
+                <span class="label">RAM Usage:</span>
+                <span class="value">{ram}%</span>
+            </div>
+            <div class="metric">
+                <span class="label">Environment:</span>
+                <span class="value">{platform.system()}</span>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content, status_code=200)
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "bot_connected": client.is_connected()}
+
+
+# ==========================================
+#       ✨ ATTRACTIVE BOT COMMANDS ✨
 # ==========================================
 
 # 1. ALIVE: Visual status check
@@ -82,7 +183,7 @@ async def sysinfo_handler(event):
         "🖥️ **S Y S T E M   I N F O R M A T I O N** 🖥️\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
         f"⚙️ **CPU Usage:** `{cpu}%`\n"
-        f"💾 **RAM Usage:** `{ram}%`\n"
+        "💾 **RAM Usage:** `{ram}%`\n"
         f"💿 **OS:** `{os_name}`\n"
         "━━━━━━━━━━━━━━━━━━━━━━"
     )
@@ -157,13 +258,29 @@ async def magic_animation(event):
             pass
 
 
-if __name__ == '__main__':
+# ==========================================
+#        🚀 DUAL-ENGINE LIFECYCLE 🚀
+# ==========================================
+
+@app.on_event("startup")
+async def startup_event():
     print("\n" + "="*50)
     print("🚀 VIZARD BOT CORE ENGINE INITIALIZING...")
     print("="*50 + "\n")
     
-    # Clean programmatic startup utilizing the target token directly
-    client.start(bot_token=BOT_TOKEN)
+    # Start the Telethon client asynchronously within the web framework's event loop
+    await client.start(bot_token=BOT_TOKEN)
+    print("✅ TELEGRAM CLIENT STABLE & LISTENING...")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    print("🛑 DISCONNECTING VIZARD BOT...")
+    await client.disconnect()
+
+if __name__ == '__main__':
+    # Grab the port injected by cloud hosts (Railway defaults to 5000 if local fallback)
+    port = int(os.environ.get("PORT", 5000))
     
-    print("✅ DEPLOYMENT STABLE! LISTENING FOR INCOMING COMMANDS...")
-    client.run_until_disconnected()
+    print("✅ DEPLOYMENT STABLE! SPINNING UP WEB APP WEB SERVER...")
+    # Run the Uvicorn Web Server
+    uvicorn.run("main.py:app", host="0.0.0.0", port=port, reload=False)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import telebot
 import subprocess
 import os
@@ -49,7 +48,8 @@ def keep_alive():
 # --- End Flask Keep Alive ---
 
 # --- Configuration ---
-TOKEN = os.getenv("8212227179:AAHiwdROhqHUU9cYdQ6NvOVKo8eGi8LO9bk") 
+# FIXED: Changed from os.getenv(TOKEN_STRING) to fallback properly.
+TOKEN = os.getenv("BOT_TOKEN", "8212227179:AAHiwdROhqHUU9cYdQ6NvOVKo8eGi8LO9bk") 
 OWNER_ID = int(os.getenv("OWNER_ID", "2119464081"))
 ADMIN_ID = int(os.getenv("ADMIN_ID", "2119464081"))
 YOUR_USERNAME = '@Xricx0' 
@@ -523,7 +523,6 @@ def handle_file_upload_doc(message):
     except Exception as e:
         bot.reply_to(message, f"❌ Unexpected error: {str(e)}")
 
-
 # --- Button Logic Handlers ---
 def _logic_send_welcome(message):
     user_id = message.from_user.id
@@ -562,14 +561,30 @@ def _logic_statistics(message):
     total_users = len(active_users)
     bot.reply_to(message, f"📊 Bot Statistics:\n\n👥 Total Users: {total_users}")
 
+def _logic_lock_bot(message):
+    if message.from_user.id in admin_ids:
+        global bot_locked
+        bot_locked = not bot_locked
+        status = "🔒 LOCKED" if bot_locked else "🔓 UNLOCKED"
+        bot.reply_to(message, f"Admin settings updated!\nBot is now **{status}**.", parse_mode='Markdown')
+    else:
+        bot.reply_to(message, "❌ Permission denied.")
+
 # --- Command Routing ---
+# ADDED: Implemented placeholders for all the admin buttons that previously did nothing.
 BUTTON_TEXT_TO_LOGIC = {
     "📢 Updates Channel": lambda m: bot.reply_to(m, f"Visit our Updates Channel: {UPDATE_CHANNEL}"),
     "📤 Upload File": _logic_upload_file,
     "📂 Check Files": _logic_check_files,
     "⚡ Bot Speed": _logic_bot_speed,
     "📊 Statistics": _logic_statistics,
-    "📞 Contact Owner": lambda m: bot.reply_to(m, f"Contact: {YOUR_USERNAME}")
+    "📞 Contact Owner": lambda m: bot.reply_to(m, f"Contact: {YOUR_USERNAME}"),
+    "🔒 Lock Bot": _logic_lock_bot,
+    "💳 Subscriptions": lambda m: bot.reply_to(m, "⚙️ Subscription Panel coming soon!"),
+    "📢 Broadcast": lambda m: bot.reply_to(m, "⚙️ Broadcast feature coming soon!"),
+    "🟢 Running All Code": lambda m: bot.reply_to(m, "⚙️ Currently running all code view..."),
+    "📤 Send Command": lambda m: bot.reply_to(m, "⚙️ Send command to sub-bot feature..."),
+    "👑 Admin Panel": lambda m: bot.reply_to(m, "⚙️ Opening main Admin panel settings...")
 }
 
 @bot.message_handler(commands=['start', 'help'])

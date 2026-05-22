@@ -8,9 +8,9 @@ from telethon import TelegramClient, events
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ⚙️ CREDENTIALS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-API_ID = "YOUR_API_ID" 
-API_HASH = "YOUR_API_HASH"
-BOT_TOKEN = "8637135798:AAEdTzCnL3fn1keuLzLxQN0BUULXlTMicVY"
+API_ID = "38843772" 
+API_HASH = "875fbb273801c8025d05e98173fca536"
+BOT_TOKEN = "8637135798:AAEdTzCnL3fn1keuLzLxQN0BUULXlTMicV"
 
 # --- Attractive Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s ⚡ %(message)s', datefmt='%H:%M:%S')

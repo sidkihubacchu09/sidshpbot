@@ -6,12 +6,11 @@ import psutil
 from telethon import TelegramClient, events
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# ⚙️ AUTO-FETCH CREDENTIALS
-# Put your details here. The host bot will automatically 
-# read them when you upload this file!
+# ⚙️ CREDENTIALS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 API_ID = "YOUR_API_ID" 
 API_HASH = "YOUR_API_HASH"
+BOT_TOKEN = "8637135798:AAEdTzCnL3fn1keuLzLxQN0BUULXlTMicVY"
 
 # --- Attractive Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s ⚡ %(message)s', datefmt='%H:%M:%S')
@@ -55,7 +54,7 @@ async def alive_handler(event):
         "━━━━━━━━━━━━━━━━━━━━━━\n"
         "👑 _Ready for your commands, Master._"
     )
-    await event.edit(alive_msg)
+    await event.respond(alive_msg)
 
 
 # 2. SYSINFO: Check your server's hardware stats
@@ -73,7 +72,7 @@ async def sysinfo_handler(event):
         f"💿 **OS:** `{os_name}`\n"
         "━━━━━━━━━━━━━━━━━━━━━━"
     )
-    await event.edit(sys_msg)
+    await event.respond(sys_msg)
 
 
 # 3. AFK MODE: Stylish away status
@@ -82,7 +81,7 @@ async def set_afk(event):
     global is_afk, afk_reason
     is_afk = True
     afk_reason = event.pattern_match.group(1)
-    await event.edit(
+    await event.respond(
         f"🛑 **S E C U R I T Y   A C T I V E** 🛑\n"
         f"User is currently AFK.\n"
         f"📝 **Reason:** `{afk_reason}`"
@@ -94,14 +93,15 @@ async def set_unafk(event):
     if is_afk:
         is_afk = False
         afk_reason = ""
-        await event.edit("✅ **User has returned. AFK deactivated.**")
+        await event.respond("✅ **User has returned. AFK deactivated.**")
 
 
 # 4. AFK AUTO-RESPONDER: Polite away message for DMs
 @client.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
 async def afk_responder(event):
     global is_afk, afk_reason
-    if is_afk:
+    # Prevent the bot from replying to its own messages or commands
+    if is_afk and not event.text.startswith('.'):
         await event.reply(
             f"🛡️ **Automated Defense System:**\n\n"
             f"The user is currently away from their keyboard.\n"
@@ -115,14 +115,18 @@ async def afk_responder(event):
 async def delete_msg(event):
     if event.is_reply:
         replied_msg = await event.get_reply_message()
-        await replied_msg.delete()
-        await event.delete()
+        try:
+            await replied_msg.delete()
+            await event.delete()
+        except:
+            pass # Bots can only delete messages if they have admin rights
 
 
 if __name__ == '__main__':
     print("\n" + "="*50)
     print("🚀 VIZARD USERBOT INITIATING...")
     print("="*50 + "\n")
-    client.start()
+    # ✅ Start the client using the Bot Token
+    client.start(bot_token=BOT_TOKEN)
     print("✅ CONNECTION ESTABLISHED! LISTENING ON TELEGRAM...")
     client.run_until_disconnected()

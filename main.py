@@ -11,30 +11,13 @@ from telethon.errors.rpcerrorlist import MessageNotModifiedError
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ⚙️ SECURE CREDENTIAL LOADER
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-API_ID = None
-API_HASH = None
+API_ID = os.environ.get("API_ID")
+API_HASH = os.environ.get("API_HASH")
 
-# Attempt to load from local config.txt file
-if os.path.exists("config.txt"):
-    with open("config.txt", "r") as f:
-        for line in f:
-            if line.strip() and "=" in line:
-                key, val = line.strip().split("=", 1)
-                if key == "API_ID":
-                    API_ID = val
-                elif key == "API_HASH":
-                    API_HASH = val
-
-# Fallback to Environment Variables if hosting on cloud
-if not API_ID:
-    API_ID = os.environ.get("API_ID")
-if not API_HASH:
-    API_HASH = os.environ.get("API_HASH")
-
+# Fallback values for local session generation if environment vars aren't set yet
 if not API_ID or not API_HASH:
-    print("❌ ERROR: Missing API_ID or API_HASH settings!")
-    print("Please make sure they are written inside config.txt or your cloud environment variables.")
-    sys.exit(1)
+    API_ID = "38843772" 
+    API_HASH = "875fbb273801c8025d05e98173fca536"
 
 # --- Attractive Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s ⚡ %(message)s', datefmt='%H:%M:%S')
@@ -63,7 +46,7 @@ async def alive_handler(event):
         "━━━━━━━━━━━━━━━━━━━━━━\n"
         "🟢 **Status:** `Systems Online`\n"
         f"⏱️ **Uptime:** `{uptime_str}`\n"
-        "🛡️ **Host:** `Production Core Engine`\n"
+        "🛡️ **Host:** `Railway Production Engine`\n"
         "✨ **Version:** `v2.5 Elite`\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
         "👑 _Ready for your commands, Master._"

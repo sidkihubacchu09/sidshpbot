@@ -10,7 +10,7 @@ from telethon import TelegramClient, events
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 API_ID = "38843772" 
 API_HASH = "875fbb273801c8025d05e98173fca536"
-BOT_TOKEN = ""
+BOT_TOKEN = "8212227179:AAHiwdROhqHUU9cYdQ6NvOVKo8eGi8LO9bk"
 
 # --- Attractive Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s ⚡ %(message)s', datefmt='%H:%M:%S')

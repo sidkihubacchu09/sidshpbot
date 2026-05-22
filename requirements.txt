@@ -1,5 +1,2 @@
-pyTelegramBotAPI
-psutil
-requests
 telethon
-flask
+psutil

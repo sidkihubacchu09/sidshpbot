@@ -1,286 +1,585 @@
+# -*- coding: utf-8 -*-
+import telebot
+import subprocess
 import os
-import sys
-import logging
+import zipfile
+import tempfile
+import shutil
+from telebot import types
 import time
-import platform
+from datetime import datetime, timedelta
 import psutil
-import asyncio
-from telethon import TelegramClient, events
-from telethon.errors.rpcerrorlist import MessageNotModifiedError
+import sqlite3
+import json
+import logging
+import signal
+import threading
+import re
+import sys
+import atexit
+import requests
+import hashlib
+import mimetypes
+import struct
+from flask import Flask, send_file, redirect
+from threading import Thread
 
-# Web App imports
-import uvicorn
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+# --- Configuration ---
+TOKEN = '8032494974:AAE3s6Uh0c-KdWsXDd5ZP_R6h6KixSUt-dw' 
+OWNER_ID = 2119464081
+ADMIN_ID = 2119464081
+YOUR_USERNAME = '@Xricx0' 
+UPDATE_CHANNEL = 'https://t.me/+5uCnxp3U1gMwZjQ1'
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# ⚙️ SECURE CREDENTIAL LOADER (Railway Dashboard)
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-API_ID = os.environ.get("API_ID")
-API_HASH = os.environ.get("API_HASH")
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
+# ⚠️ IMPORTANT: Change this to your actual server/hosting URL!
+# Example: "https://my-hosting-bot.username.repl.co"
+HOSTING_DOMAIN = "https://your-server-url.com" 
 
-# Fallback values for local testing if cloud variables aren't active yet
-if not API_ID or not API_HASH or not BOT_TOKEN:
-    API_ID = "38843772"
-    API_HASH = "875fbb273801c8025d05e98173fca536"
-    BOT_TOKEN = "8212227179:AAHiwdROhqHUU9cYdQ6NvOVKo8eGi8LO9bk"
+# Folder setup - using absolute paths
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+UPLOAD_BOTS_DIR = os.path.join(BASE_DIR, 'upload_bots')
+IROTECH_DIR = os.path.join(BASE_DIR, 'inf')
+DATABASE_PATH = os.path.join(IROTECH_DIR, 'bot_data.db')
 
-# --- Attractive Logging Setup ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s ⚡ %(message)s', datefmt='%H:%M:%S')
+# Path where the bot will save the uploaded video
+MENU_VIDEO_PATH = os.path.join(BASE_DIR, 'menu_video.mp4')
 
-# Initialize client cleanly as a Telegram Bot Engine
-client = TelegramClient('vizard_bot_session', int(API_ID), API_HASH)
+# File upload limits
+FREE_USER_LIMIT = 10
+SUBSCRIBED_USER_LIMIT = 15
+ADMIN_LIMIT = 999
+OWNER_LIMIT = float('inf')
 
-# Initialize FastAPI App
-app = FastAPI(title="Vizard Bot Dashboard")
+# Create necessary directories
+os.makedirs(UPLOAD_BOTS_DIR, exist_ok=True)
+os.makedirs(IROTECH_DIR, exist_ok=True)
 
-# --- Global Variables ---
-start_time = time.time()
+# Initialize bot
+bot = telebot.TeleBot(TOKEN)
 
-# ==========================================
-#         🌐 WEB APPLICATION LAYER
-# ==========================================
+# --- Flask Keep Alive & Web App ---
+app = Flask('')
 
-@app.get("/", response_class=HTMLResponse)
-async def dashboard():
-    uptime = round(time.time() - start_time)
-    minutes, seconds = divmod(uptime, 60)
-    hours, minutes = divmod(minutes, 60)
-    uptime_str = f"{hours}h {minutes}m {seconds}s"
-    
-    cpu = psutil.cpu_percent(interval=None)
-    ram = psutil.virtual_memory().percent
-    
-    # Modern dark-mode HTML dashboard
-    html_content = f"""
+@app.route('/')
+def home():
+    return "Bot is running securely...."
+
+@app.route('/menu_video.mp4')
+def serve_menu_video():
+    """Serves the actual video file to the dashboard"""
+    if os.path.exists(MENU_VIDEO_PATH):
+        return send_file(MENU_VIDEO_PATH, mimetype='video/mp4')
+    else:
+        # Fallback default video if the owner hasn't uploaded one yet
+        return redirect("https://www.w3schools.com/html/mov_bbb.mp4")
+
+@app.route('/webapp')
+def webapp():
+    """The visually attractive Web App dashboard with the video frame"""
+    html = f"""
     <!DOCTYPE html>
-    <html lang="en">
+    <html>
     <head>
-        <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Vizard Bot Dashboard</title>
+        <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <style>
-            body {{
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background-color: #0e1118;
-                color: #ffffff;
-                margin: 0;
-                padding: 0;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
+            body {{ 
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                background-color: var(--tg-theme-bg-color, #1e1e1e); 
+                color: var(--tg-theme-text-color, #ffffff); 
+                margin: 0; padding: 0; text-align: center; 
             }}
-            .card {{
-                background: #161b26;
-                padding: 30px;
-                border-radius: 15px;
-                box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-                border: 1px solid #232d3f;
-                max-width: 400px;
-                width: 100%;
-                text-align: center;
+            .video-container {{ 
+                width: 100%; height: 220px; background: #000; 
+                border-bottom: 3px solid var(--tg-theme-button-color, #3390ec);
             }}
-            h1 {{ color: #00e676; margin-bottom: 5px; font-size: 24px; letter-spacing: 2px; }}
-            .subtitle {{ color: #8a99ad; font-size: 14px; margin-bottom: 25px; }}
-            .metric {{
-                display: flex;
-                justify-content: space-between;
-                padding: 12px 0;
-                border-bottom: 1px solid #232d3f;
+            video {{ width: 100%; height: 100%; object-fit: cover; }}
+            .content {{ padding: 25px; }}
+            h2 {{ margin-top: 0; color: var(--tg-theme-button-color, #3390ec); }}
+            .btn {{ 
+                background-color: var(--tg-theme-button-color, #3390ec); 
+                color: var(--tg-theme-button-text-color, #fff); 
+                border: none; padding: 14px 24px; border-radius: 8px; 
+                font-size: 16px; font-weight: bold; cursor: pointer; width: 80%;
+                margin-top: 20px;
             }}
-            .metric:last-child {{ border: none; }}
-            .label {{ color: #8a99ad; font-weight: 500; }}
-            .value {{ font-family: 'Courier New', Courier, monospace; color: #00b0ff; font-weight: bold; }}
-            .status-online {{ color: #00e676; font-weight: bold; }}
         </style>
     </head>
     <body>
-        <div class="card">
-            <h1>🤖 VIZARD BOT </h1>
-            <div class="subtitle">Production Control Panel</div>
-            <div class="metric">
-                <span class="label">Status:</span>
-                <span class="value status-online">Systems Online</span>
-            </div>
-            <div class="metric">
-                <span class="label">Uptime:</span>
-                <span class="value">{uptime_str}</span>
-            </div>
-            <div class="metric">
-                <span class="label">CPU Load:</span>
-                <span class="value">{cpu}%</span>
-            </div>
-            <div class="metric">
-                <span class="label">RAM Usage:</span>
-                <span class="value">{ram}%</span>
-            </div>
-            <div class="metric">
-                <span class="label">Environment:</span>
-                <span class="value">{platform.system()}</span>
-            </div>
+        <div class="video-container">
+            <video src="/menu_video.mp4" autoplay loop muted playsinline></video>
         </div>
+        <div class="content">
+            <h2>✨ Hosting Dashboard ✨</h2>
+            <p>Welcome to the advanced control panel. Manage your scripts securely.</p>
+            <button class="btn" onclick="Telegram.WebApp.close()">Close Menu</button>
+        </div>
+        <script>
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
+        </script>
     </body>
     </html>
     """
-    return HTMLResponse(content=html_content, status_code=200)
+    return html
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "bot_connected": client.is_connected()}
+def run_flask():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
 
+def keep_alive():
+    t = Thread(target=run_flask)
+    t.daemon = True
+    t.start()
+    print("Flask Web Server & Keep-Alive started.")
+# --- End Flask Keep Alive ---
 
-# ==========================================
-#       ✨ ATTRACTIVE BOT COMMANDS ✨
-# ==========================================
+# --- Data structures ---
+bot_scripts = {}
+user_subscriptions = {}
+user_files = {}
+active_users = set()
+admin_ids = {ADMIN_ID, OWNER_ID}
+bot_locked = False
 
-# 1. ALIVE: Visual status check
-@client.on(events.NewMessage(pattern=r'\.alive', incoming=True))
-async def alive_handler(event):
-    uptime = round(time.time() - start_time)
-    minutes, seconds = divmod(uptime, 60)
-    hours, minutes = divmod(minutes, 60)
-    uptime_str = f"{hours}h {minutes}m {seconds}s"
-    
-    alive_msg = (
-        "🤖 **V I Z A R D   B O T** 🤖\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🟢 **Status:** `Systems Online`\n"
-        f"⏱️ **Uptime:** `{uptime_str}`\n"
-        "🛡️ **Host:** `Railway Production Engine`\n"
-        "✨ **Version:** `v3.0 Bot-Core`\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "👑 _Ready for your commands, Master._"
-    )
-    await event.respond(alive_msg)
+# --- Malware Detection Configuration ---
+MALWARE_SIGNATURES = [
+    b'MZ', b'\x7fELF', b'\xfe\xed\xfa', b'\xce\xfa\xed\xfe', b'PK', b'Rar!',
+]
+ENCRYPTED_FILE_INDICATORS = [
+    b'openssl', b'encrypted', b'cipher', b'AES', b'DES', b'RSA', b'GPG', b'PGP',
+]
+SUSPICIOUS_KEYWORDS = [
+    b'ransomware', b'trojan', b'virus', b'malware', b'backdoor', 
+    b'exploit', b'payload', b'botnet', b'keylogger', b'rootkit',
+]
 
+# --- Logging Setup ---
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-# 2. PING: Response efficiency check
-@client.on(events.NewMessage(pattern=r'\.ping', incoming=True))
-async def ping_handler(event):
-    start = time.time()
-    msg = await event.respond("🏓 `Pinging server...`")
-    end = time.time()
-    ping_time = round((end - start) * 1000, 2)
-    
-    await msg.edit(
-        "🏓 **P O N G !**\n"
-        "━━━━━━━━━━━━━━\n"
-        f"⚡ **Speed:** `{ping_time} ms`\n"
-        "━━━━━━━━━━━━━━"
-    )
+# --- Command Button Layouts ---
+COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
+    ["📢 Updates Channel"],
+    ["📤 Upload File", "📂 Check Files"],
+    ["⚡ Bot Speed", "📊 Statistics"],
+    ["📤 Send Command", "📞 Contact Owner"]
+]
+ADMIN_COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
+    ["📢 Updates Channel"],
+    ["📤 Upload File", "📂 Check Files"],
+    ["⚡ Bot Speed", "📊 Statistics"],
+    ["💳 Subscriptions", "📢 Broadcast"],
+    ["🔒 Lock Bot", "🟢 Running All Code"],
+    ["📤 Send Command", "👑 Admin Panel"],
+    ["📞 Contact Owner"]
+]
 
+# --- Database Setup ---
+def init_db():
+    try:
+        conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS subscriptions (user_id INTEGER PRIMARY KEY, expiry TEXT)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS user_files (user_id INTEGER, file_name TEXT, file_type TEXT, PRIMARY KEY (user_id, file_name))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS active_users (user_id INTEGER PRIMARY KEY)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS admins (user_id INTEGER PRIMARY KEY)''')
+        c.execute('INSERT OR IGNORE INTO admins (user_id) VALUES (?)', (OWNER_ID,))
+        if ADMIN_ID != OWNER_ID:
+            c.execute('INSERT OR IGNORE INTO admins (user_id) VALUES (?)', (ADMIN_ID,))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"❌ Database error: {e}")
 
-# 3. SYSINFO: Hosting hardware performance metrics
-@client.on(events.NewMessage(pattern=r'\.sysinfo', incoming=True))
-async def sysinfo_handler(event):
-    cpu = psutil.cpu_percent(interval=0.5)
-    ram = psutil.virtual_memory().percent
-    os_name = platform.system()
-    
-    sys_msg = (
-        "🖥️ **S Y S T E M   I N F O R M A T I O N** 🖥️\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"⚙️ **CPU Usage:** `{cpu}%`\n"
-        "💾 **RAM Usage:** `{ram}%`\n"
-        f"💿 **OS:** `{os_name}`\n"
-        "━━━━━━━━━━━━━━━━━━━━━━"
-    )
-    await event.respond(sys_msg)
+def load_data():
+    try:
+        conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+        c = conn.cursor()
+        c.execute('SELECT user_id, expiry FROM subscriptions')
+        for user_id, expiry in c.fetchall():
+            try: user_subscriptions[user_id] = {'expiry': datetime.fromisoformat(expiry)}
+            except ValueError: pass
+        c.execute('SELECT user_id, file_name, file_type FROM user_files')
+        for user_id, file_name, file_type in c.fetchall():
+            if user_id not in user_files: user_files[user_id] = []
+            user_files[user_id].append((file_name, file_type))
+        c.execute('SELECT user_id FROM active_users')
+        active_users.update(user_id for (user_id,) in c.fetchall())
+        c.execute('SELECT user_id FROM admins')
+        admin_ids.update(user_id for (user_id,) in c.fetchall())
+        conn.close()
+    except Exception as e:
+        logger.error(f"❌ Error loading data: {e}")
 
+init_db()
+load_data()
 
-# 4. INFO: Extract demographic profile details of a user
-@client.on(events.NewMessage(pattern=r'\.info', incoming=True))
-async def get_info(event):
-    if not event.is_reply:
-        return await event.respond("⚠️ `Reply to a user's message to target their info.`")
-    
-    replied_msg = await event.get_reply_message()
-    user = await replied_msg.get_sender()
-    
-    if user:
-        info_msg = (
-            "👤 **U S E R   I N F O** 👤\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"🔹 **First Name:** `{user.first_name}`\n"
-            f"🔹 **Last Name:** `{user.last_name or 'None'}`\n"
-            f"🔹 **Username:** `@{user.username or 'None'}`\n"
-            f"🔹 **User ID:** `{user.id}`\n"
-            f"🔹 **Bot Check:** `{user.bot}`\n"
-            "━━━━━━━━━━━━━━━━━━━━"
-        )
-        await event.respond(info_msg)
+DB_LOCK = threading.Lock() 
 
-
-# 5. ID: Fetch functional space routing indexes
-@client.on(events.NewMessage(pattern=r'\.id', incoming=True))
-async def get_id(event):
-    chat_id = event.chat_id
-    if event.is_reply:
-        replied_msg = await event.get_reply_message()
-        user_id = replied_msg.sender_id
-        await event.respond(f"🏷️ **Chat ID:** `{chat_id}`\n👤 **User ID:** `{user_id}`")
-    else:
-        await event.respond(f"🏷️ **Chat ID:** `{chat_id}`")
-
-
-# 6. SPAM: Managed rate transmission loop
-@client.on(events.NewMessage(pattern=r'\.spam (\d+) (.*)', incoming=True))
-async def spam_handler(event):
-    count = int(event.pattern_match.group(1))
-    text = event.pattern_match.group(2)
-    
-    if count > 30:
-        return await event.respond("⚠️ `Spam limit capped at 30 to bypass Telegram structural blocks.`")
-        
-    for _ in range(count):
-        await event.respond(text)
-        await asyncio.sleep(0.4)
-
-
-# 7. MAGIC: Matrix mutation design sequence
-@client.on(events.NewMessage(pattern=r'\.magic', incoming=True))
-async def magic_animation(event):
-    msg = await event.respond("🕛 `Initiating Magic...`")
-    animations = [
-        "🕧 `Gathering Mana...`",
-        "💡 `Casting Spell...`",
-        "⚡ **V I Z A R D** ⚡",
-        "✨ **M A G I C** ✨",
-        "💥 **O V E R P O W E R E D** 💥"
-    ]
-    for frame in animations:
+def save_user_file(user_id, file_name, file_type='py'):
+    with DB_LOCK:
+        conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+        c = conn.cursor()
         try:
-            await msg.edit(frame)
-            await asyncio.sleep(0.5)
-        except MessageNotModifiedError:
-            pass
+            c.execute('INSERT OR REPLACE INTO user_files (user_id, file_name, file_type) VALUES (?, ?, ?)',
+                      (user_id, file_name, file_type))
+            conn.commit()
+            if user_id not in user_files: user_files[user_id] = []
+            user_files[user_id] = [(fn, ft) for fn, ft in user_files[user_id] if fn != file_name]
+            user_files[user_id].append((file_name, file_type))
+        except Exception as e: logger.error(f"Error saving file: {e}")
+        finally: conn.close()
 
+def remove_user_file_db(user_id, file_name):
+    with DB_LOCK:
+        conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+        c = conn.cursor()
+        try:
+            c.execute('DELETE FROM user_files WHERE user_id = ? AND file_name = ?', (user_id, file_name))
+            conn.commit()
+            if user_id in user_files:
+                user_files[user_id] = [f for f in user_files[user_id] if f[0] != file_name]
+        except Exception as e: logger.error(f"Error removing file: {e}")
+        finally: conn.close()
 
-# ==========================================
-#        🚀 DUAL-ENGINE LIFECYCLE 🚀
-# ==========================================
+# --- Malware Detection Functions ---
+def get_file_type(file_content):
+    signatures = {
+        b'\x7fELF': 'application/x-executable', b'MZ': 'application/x-dosexec',
+        b'\xfe\xed\xfa': 'application/x-mach-binary', b'\xce\xfa\xed\xfe': 'application/x-mach-binary',
+        b'PK': 'application/zip', b'Rar!': 'application/x-rar',
+    }
+    for signature, mime_type in signatures.items():
+        if file_content.startswith(signature): return mime_type
+    return 'application/octet-stream'
 
-@app.on_event("startup")
-async def startup_event():
-    print("\n" + "="*50)
-    print("🚀 VIZARD BOT CORE ENGINE INITIALIZING...")
-    print("="*50 + "\n")
+def is_suspicious_file(file_content, file_name):
+    file_lower = file_name.lower()
+    suspicious_extensions = ['.exe', '.dll', '.bat', '.cmd', '.scr', '.com', '.pif', '.application', '.gadget',
+                            '.msi', '.msp', '.com', '.scr', '.hta', '.cpl', '.msc', '.jar', '.bin', '.deb', '.rpm',
+                            '.apk', '.app', '.dmg', '.iso', '.img']
+    if any(file_lower.endswith(ext) for ext in suspicious_extensions):
+        return True, f"Suspicious file extension: {file_name}"
+    for signature in MALWARE_SIGNATURES:
+        if file_content.startswith(signature): return True, f"Malware signature detected"
     
-    # Start the Telethon client asynchronously within the web framework's event loop
-    await client.start(bot_token=BOT_TOKEN)
-    print("✅ TELEGRAM CLIENT STABLE & LISTENING...")
+    sample_size = min(len(file_content), 4096)
+    file_sample = file_content[:sample_size]
+    for indicator in ENCRYPTED_FILE_INDICATORS:
+        if indicator in file_sample: return True, f"Encrypted file indicator"
+    sample_text = file_sample.decode('utf-8', errors='ignore').lower()
+    for keyword in SUSPICIOUS_KEYWORDS:
+        if keyword.decode('utf-8').lower() in sample_text: return True, f"Suspicious keyword found"
+    try:
+        file_type = get_file_type(file_sample)
+        if file_type in ['application/x-dosexec', 'application/x-executable', 'application/x-mach-binary']:
+            return True, f"Executable file type detected: {file_type}"
+    except Exception: pass
+    return False, "File appears safe"
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    print("🛑 DISCONNECTING VIZARD BOT...")
-    await client.disconnect()
+def scan_file_for_malware(file_content, file_name, user_id):
+    if user_id == OWNER_ID: return True, "Owner bypassed security check"
+    is_suspicious, reason = is_suspicious_file(file_content, file_name)
+    if is_suspicious: return False, f"Security violation: {reason}"
+    return True, "File passed security check"
+
+# --- Helper Functions ---
+def get_user_folder(user_id):
+    user_folder = os.path.join(UPLOAD_BOTS_DIR, str(user_id))
+    os.makedirs(user_folder, exist_ok=True)
+    return user_folder
+
+def get_user_file_limit(user_id):
+    if user_id == OWNER_ID: return OWNER_LIMIT
+    if user_id in admin_ids: return ADMIN_LIMIT
+    if user_id in user_subscriptions and user_subscriptions[user_id]['expiry'] > datetime.now():
+        return SUBSCRIBED_USER_LIMIT
+    return FREE_USER_LIMIT
+
+def get_user_file_count(user_id): return len(user_files.get(user_id, []))
+
+def is_bot_running(script_owner_id, file_name):
+    script_key = f"{script_owner_id}_{file_name}"
+    script_info = bot_scripts.get(script_key)
+    if script_info and script_info.get('process'):
+        try:
+            proc = psutil.Process(script_info['process'].pid)
+            is_running = proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE
+            if not is_running:
+                if 'log_file' in script_info and not script_info['log_file'].closed: script_info['log_file'].close()
+                if script_key in bot_scripts: del bot_scripts[script_key]
+            return is_running
+        except psutil.NoSuchProcess:
+            if 'log_file' in script_info and not script_info['log_file'].closed: script_info['log_file'].close()
+            if script_key in bot_scripts: del bot_scripts[script_key]
+            return False
+    return False
+
+def kill_process_tree(process_info):
+    try:
+        if 'log_file' in process_info and not process_info['log_file'].closed: process_info['log_file'].close()
+        process = process_info.get('process')
+        if process and hasattr(process, 'pid'):
+            pid = process.pid
+            try:
+                parent = psutil.Process(pid)
+                children = parent.children(recursive=True)
+                for child in children:
+                    try: child.kill()
+                    except psutil.NoSuchProcess: pass
+                psutil.wait_procs(children, timeout=1)
+                try: parent.kill()
+                except psutil.NoSuchProcess: pass
+            except psutil.NoSuchProcess: pass
+    except Exception as e: logger.error(f"Error killing process: {e}")
+
+# --- Menu creation ---
+def create_main_menu_inline(user_id):
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    web_app_url = f"{HOSTING_DOMAIN}/webapp"
+    buttons = [
+        types.InlineKeyboardButton('📱 Open Visual Dashboard', web_app=types.WebAppInfo(url=web_app_url)),
+        types.InlineKeyboardButton('📢 Updates Channel', url=UPDATE_CHANNEL),
+        types.InlineKeyboardButton('📤 Upload File', callback_data='upload'),
+        types.InlineKeyboardButton('📂 Check Files', callback_data='check_files'),
+        types.InlineKeyboardButton('⚡ Bot Speed', callback_data='speed'),
+        types.InlineKeyboardButton('📤 Send Command', callback_data='send_command'),
+        types.InlineKeyboardButton('📞 Contact Owner', url=f'https://t.me/{YOUR_USERNAME.replace("@", "")}')
+    ]
+
+    if user_id in admin_ids:
+        admin_buttons = [
+            types.InlineKeyboardButton('💳 Subscriptions', callback_data='subscription'),
+            types.InlineKeyboardButton('📊 Statistics', callback_data='stats'),
+            types.InlineKeyboardButton('🔒 Lock Bot' if not bot_locked else '🔓 Unlock Bot',
+                                     callback_data='lock_bot' if not bot_locked else 'unlock_bot'),
+            types.InlineKeyboardButton('📢 Broadcast', callback_data='broadcast'),
+            types.InlineKeyboardButton('👑 Admin Panel', callback_data='admin_panel'),
+            types.InlineKeyboardButton('🟢 Run All User Scripts', callback_data='run_all_scripts')
+        ]
+        markup.add(buttons[0]) 
+        markup.add(buttons[1])
+        markup.add(buttons[2], buttons[3])
+        markup.add(buttons[4], buttons[5])
+        markup.add(admin_buttons[0], admin_buttons[1])
+        markup.add(admin_buttons[3], admin_buttons[4])
+        markup.add(admin_buttons[2], admin_buttons[5])
+        markup.add(buttons[6])
+    else:
+        markup.add(buttons[0]) 
+        markup.add(buttons[1])
+        markup.add(buttons[2], buttons[3])
+        markup.add(buttons[4], buttons[5])
+        markup.add(types.InlineKeyboardButton('📊 Statistics', callback_data='stats'))
+        markup.add(buttons[6])
+    return markup
+
+def create_reply_keyboard_main_menu(user_id):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    layout_to_use = ADMIN_COMMAND_BUTTONS_LAYOUT_USER_SPEC if user_id in admin_ids else COMMAND_BUTTONS_LAYOUT_USER_SPEC
+    for row_buttons_text in layout_to_use: markup.add(*[types.KeyboardButton(text) for text in row_buttons_text])
+    return markup
+
+def create_control_buttons(script_owner_id, file_name, is_running=True):
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    if is_running:
+        markup.row(types.InlineKeyboardButton("🔴 Stop", callback_data=f'stop_{script_owner_id}_{file_name}'),
+                   types.InlineKeyboardButton("🔄 Restart", callback_data=f'restart_{script_owner_id}_{file_name}'))
+        markup.row(types.InlineKeyboardButton("🗑️ Delete", callback_data=f'delete_{script_owner_id}_{file_name}'),
+                   types.InlineKeyboardButton("📜 Logs", callback_data=f'logs_{script_owner_id}_{file_name}'))
+    else:
+        markup.row(types.InlineKeyboardButton("🟢 Start", callback_data=f'start_{script_owner_id}_{file_name}'),
+                   types.InlineKeyboardButton("🗑️ Delete", callback_data=f'delete_{script_owner_id}_{file_name}'))
+        markup.row(types.InlineKeyboardButton("📜 View Logs", callback_data=f'logs_{script_owner_id}_{file_name}'))
+    markup.add(types.InlineKeyboardButton("🔙 Back to Files", callback_data='check_files'))
+    return markup
+
+# --- Admin Command to Set the Video via File Upload ---
+@bot.message_handler(content_types=['video'])
+def handle_menu_video_upload(message):
+    """Allows the owner to upload an actual video file for the Web App menu."""
+    user_id = message.from_user.id
+    if user_id in admin_ids and message.caption and message.caption.strip().lower() == '/setvideo':
+        if message.video.file_size > 20 * 1024 * 1024:
+            bot.reply_to(message, "⚠️ Video is too large! Please upload an MP4 under 20MB.")
+            return
+        try:
+            wait_msg = bot.reply_to(message, "⏳ Downloading and setting your new menu video. Please wait...")
+            file_info = bot.get_file(message.video.file_id)
+            downloaded_file = bot.download_file(file_info.file_path)
+            
+            with open(MENU_VIDEO_PATH, 'wb') as new_file:
+                new_file.write(downloaded_file)
+                
+            bot.edit_message_text("✅ Video successfully uploaded and set! Open your Dashboard menu to see it.", 
+                                  chat_id=message.chat.id, message_id=wait_msg.message_id)
+        except Exception as e:
+            bot.edit_message_text(f"❌ Failed to process video: {e}", chat_id=message.chat.id, message_id=wait_msg.message_id)
+
+# --- Automatic Package Installation & Script Running ---
+def attempt_install_pip(module_name, message):
+    try:
+        command = [sys.executable, '-m', 'pip', 'install', module_name]
+        subprocess.run(command, capture_output=True, text=True, check=False)
+        return True
+    except Exception: return False
+
+def run_script(script_path, script_owner_id, user_folder, file_name, message_obj_for_reply, attempt=1):
+    script_key = f"{script_owner_id}_{file_name}"
+    try:
+        log_file_path = os.path.join(user_folder, f"{os.path.splitext(file_name)[0]}.log")
+        log_file = open(log_file_path, 'w', encoding='utf-8', errors='ignore')
+        process = subprocess.Popen([sys.executable, script_path], cwd=user_folder, stdout=log_file, stderr=log_file, stdin=subprocess.PIPE)
+        bot_scripts[script_key] = {
+            'process': process, 'log_file': log_file, 'file_name': file_name,
+            'chat_id': message_obj_for_reply.chat.id, 'script_owner_id': script_owner_id,
+            'start_time': datetime.now(), 'user_folder': user_folder, 'type': 'py', 'script_key': script_key
+        }
+        bot.reply_to(message_obj_for_reply, f"✅ Script '{file_name}' started! (PID: {process.pid})")
+    except Exception as e: bot.reply_to(message_obj_for_reply, f"❌ Error: {e}")
+
+def run_js_script(script_path, script_owner_id, user_folder, file_name, message_obj_for_reply, attempt=1):
+    script_key = f"{script_owner_id}_{file_name}"
+    try:
+        log_file_path = os.path.join(user_folder, f"{os.path.splitext(file_name)[0]}.log")
+        log_file = open(log_file_path, 'w', encoding='utf-8', errors='ignore')
+        process = subprocess.Popen(['node', script_path], cwd=user_folder, stdout=log_file, stderr=log_file, stdin=subprocess.PIPE)
+        bot_scripts[script_key] = {
+            'process': process, 'log_file': log_file, 'file_name': file_name,
+            'chat_id': message_obj_for_reply.chat.id, 'script_owner_id': script_owner_id,
+            'start_time': datetime.now(), 'user_folder': user_folder, 'type': 'js', 'script_key': script_key
+        }
+        bot.reply_to(message_obj_for_reply, f"✅ Script '{file_name}' started! (PID: {process.pid})")
+    except Exception as e: bot.reply_to(message_obj_for_reply, f"❌ Error: {e}")
+
+# --- Handlers ---
+@bot.message_handler(commands=['start', 'help'])
+def command_send_welcome(message):
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    if user_id not in active_users:
+        active_users.add(user_id)
+        conn = sqlite3.connect(DATABASE_PATH)
+        c = conn.cursor()
+        c.execute('INSERT OR IGNORE INTO active_users (user_id) VALUES (?)', (user_id,))
+        conn.commit(); conn.close()
+
+    main_reply_markup = create_reply_keyboard_main_menu(user_id)
+    inline_markup = create_main_menu_inline(user_id)
+    bot.send_message(chat_id, "Welcome to Hosting Bot!", reply_markup=main_reply_markup)
+    bot.send_message(chat_id, "Choose an option below:", reply_markup=inline_markup)
+
+@bot.message_handler(content_types=['document'])
+def handle_file_upload_doc(message):
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    doc = message.document
+
+    if bot_locked and user_id not in admin_ids:
+        bot.reply_to(message, "⚠️ Bot locked, cannot accept files.")
+        return
+
+    file_limit = get_user_file_limit(user_id)
+    current_files = get_user_file_count(user_id)
+    if current_files >= file_limit:
+        bot.reply_to(message, f"⚠️ File limit reached.")
+        return
+
+    file_name = doc.file_name
+    file_ext = os.path.splitext(file_name)[1].lower()
+    if file_ext not in ['.py', '.js', '.zip']:
+        bot.reply_to(message, "⚠️ Unsupported type! Only `.py`, `.js`, `.zip` allowed.")
+        return
+
+    try:
+        download_wait_msg = bot.reply_to(message, f"⏳ Downloading `{file_name}`...")
+        file_info_tg_doc = bot.get_file(doc.file_id)
+        downloaded_file_content = bot.download_file(file_info_tg_doc.file_path)
+        
+        if user_id != OWNER_ID:
+            is_safe, reason = scan_file_for_malware(downloaded_file_content, file_name, user_id)
+            if not is_safe:
+                bot.edit_message_text(f"🚨 Security Alert: {reason}", chat_id, download_wait_msg.message_id)
+                return
+        
+        bot.edit_message_text(f"✅ Downloaded `{file_name}`. Processing...", chat_id, download_wait_msg.message_id)
+        user_folder = get_user_folder(user_id)
+
+        file_path = os.path.join(user_folder, file_name)
+        with open(file_path, 'wb') as f: f.write(downloaded_file_content)
+        
+        if file_ext == '.js': 
+            save_user_file(user_id, file_name, 'js')
+            threading.Thread(target=run_js_script, args=(file_path, user_id, user_folder, file_name, message)).start()
+        elif file_ext == '.py': 
+            save_user_file(user_id, file_name, 'py')
+            threading.Thread(target=run_script, args=(file_path, user_id, user_folder, file_name, message)).start()
+    except Exception as e:
+        bot.reply_to(message, f"❌ Unexpected error: {str(e)}")
+
+@bot.callback_query_handler(func=lambda call: True)
+def handle_callbacks(call):
+    user_id = call.from_user.id
+    data = call.data
+
+    if data == 'check_files':
+        user_files_list = user_files.get(user_id, [])
+        if not user_files_list:
+            bot.answer_callback_query(call.id, "⚠️ No files uploaded.", show_alert=True)
+            return
+        bot.answer_callback_query(call.id) 
+        markup = types.InlineKeyboardMarkup(row_width=1) 
+        for file_name, file_type in sorted(user_files_list): 
+            is_running = is_bot_running(user_id, file_name)
+            status_icon = "🟢 Running" if is_running else "🔴 Stopped"
+            btn_text = f"{file_name} ({file_type}) - {status_icon}"
+            markup.add(types.InlineKeyboardButton(btn_text, callback_data=f'file_{user_id}_{file_name}'))
+        markup.add(types.InlineKeyboardButton("🔙 Back to Main", callback_data='back_to_main'))
+        bot.edit_message_text("📂 Your files:", call.message.chat.id, call.message.message_id, reply_markup=markup)
+    
+    elif data.startswith('file_'):
+        _, script_owner_id_str, file_name = call.data.split('_', 2)
+        script_owner_id = int(script_owner_id_str)
+        is_running = is_bot_running(script_owner_id, file_name)
+        bot.answer_callback_query(call.id)
+        bot.edit_message_text(
+            f"⚙️ Controls for: `{file_name}`\nStatus: {'🟢 Running' if is_running else '🔴 Stopped'}",
+            call.message.chat.id, call.message.message_id,
+            reply_markup=create_control_buttons(script_owner_id, file_name, is_running), parse_mode='Markdown'
+        )
+
+    elif data.startswith('start_'):
+        _, script_owner_id_str, file_name = call.data.split('_', 2)
+        script_owner_id = int(script_owner_id_str)
+        user_folder = get_user_folder(script_owner_id)
+        file_path = os.path.join(user_folder, file_name)
+        bot.answer_callback_query(call.id, f"⏳ Starting {file_name}...")
+        if file_name.endswith('.py'):
+            threading.Thread(target=run_script, args=(file_path, script_owner_id, user_folder, file_name, call.message)).start()
+        elif file_name.endswith('.js'):
+            threading.Thread(target=run_js_script, args=(file_path, script_owner_id, user_folder, file_name, call.message)).start()
+            
+    elif data.startswith('stop_'):
+        _, script_owner_id_str, file_name = call.data.split('_', 2)
+        script_key = f"{script_owner_id_str}_{file_name}"
+        bot.answer_callback_query(call.id, f"⏳ Stopping {file_name}...")
+        if script_key in bot_scripts:
+            kill_process_tree(bot_scripts[script_key])
+            del bot_scripts[script_key]
+
+    elif data == 'back_to_main':
+        bot.answer_callback_query(call.id)
+        bot.edit_message_text("Main Menu:", call.message.chat.id, call.message.message_id, reply_markup=create_main_menu_inline(user_id))
+
+def cleanup():
+    for key in list(bot_scripts.keys()):
+        kill_process_tree(bot_scripts[key])
+atexit.register(cleanup)
 
 if __name__ == '__main__':
-    # Grab the port injected by cloud hosts (Railway defaults to 5000 if local fallback)
-    port = int(os.environ.get("PORT", 5000))
-    
-    print("✅ DEPLOYMENT STABLE! SPINNING UP WEB APP WEB SERVER...")
-    # Run the Uvicorn Web Server
-    uvicorn.run("main.py:app", host="0.0.0.0", port=port, reload=False)
+    keep_alive()
+    logger.info("🚀 Starting polling...")
+    while True:
+        try: bot.infinity_polling(timeout=60, long_polling_timeout=30)
+        except Exception as e: time.sleep(15)

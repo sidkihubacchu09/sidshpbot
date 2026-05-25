@@ -378,8 +378,8 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
             'chat_id': message_obj_for_reply.chat.id, 'script_owner_id': script_owner_id,
             'start_time': datetime.now(), 'user_folder': user_folder, 'type': 'py', 'script_key': script_key
         }
-        bot.reply_to(message_obj_for_reply, f"✅ Script '{file_name}' started! (PID: {process.pid})")
-    except Exception as e: bot.reply_to(message_obj_for_reply, f"❌ Error: {e}")
+        bot.send_message(message_obj_for_reply.chat.id, f"✅ Script '{file_name}' started! (PID: {process.pid})")
+    except Exception as e: bot.send_message(message_obj_for_reply.chat.id, f"❌ Error: {e}")
 
 def run_js_script(script_path, script_owner_id, user_folder, file_name, message_obj_for_reply, attempt=1):
     script_key = f"{script_owner_id}_{file_name}"
@@ -392,8 +392,8 @@ def run_js_script(script_path, script_owner_id, user_folder, file_name, message_
             'chat_id': message_obj_for_reply.chat.id, 'script_owner_id': script_owner_id,
             'start_time': datetime.now(), 'user_folder': user_folder, 'type': 'js', 'script_key': script_key
         }
-        bot.reply_to(message_obj_for_reply, f"✅ Script '{file_name}' started! (PID: {process.pid})")
-    except Exception as e: bot.reply_to(message_obj_for_reply, f"❌ Error: {e}")
+        bot.send_message(message_obj_for_reply.chat.id, f"✅ Script '{file_name}' started! (PID: {process.pid})")
+    except Exception as e: bot.send_message(message_obj_for_reply.chat.id, f"❌ Error: {e}")
 
 # --- Handlers ---
 @bot.message_handler(commands=['start', 'help'])
@@ -464,7 +464,43 @@ def handle_callbacks(call):
     user_id = call.from_user.id
     data = call.data
 
-    if data == 'check_files':
+    # --- Handlers for main menu buttons ---
+    if data == 'upload':
+        bot.answer_callback_query(call.id)
+        bot.send_message(call.message.chat.id, "📤 **Ready for upload!**\nPlease send your `.py`, `.js`, or `.zip` file directly to this chat.", parse_mode="Markdown")
+        
+    elif data == 'speed':
+        bot.answer_callback_query(call.id)
+        bot.send_message(call.message.chat.id, "⚡ Bot speed is normal. Server is running smoothly.")
+        
+    elif data == 'send_command':
+        bot.answer_callback_query(call.id)
+        bot.send_message(call.message.chat.id, "📤 Command sender feature is active.")
+        
+    elif data == 'stats':
+        bot.answer_callback_query(call.id)
+        total_files = sum(len(f) for f in user_files.values())
+        bot.send_message(call.message.chat.id, f"📊 **Bot Statistics:**\n\nActive Users: {len(active_users)}\nTotal Hosted Files: {total_files}", parse_mode="Markdown")
+
+    # --- Handlers for Admin buttons ---
+    elif data in ['subscription', 'broadcast', 'admin_panel', 'run_all_scripts']:
+        bot.answer_callback_query(call.id, "👑 Admin feature is under construction!", show_alert=True)
+
+    elif data == 'lock_bot':
+        global bot_locked
+        bot_locked = True
+        bot.answer_callback_query(call.id, "🔒 Bot is now Locked! Only admins can upload.", show_alert=True)
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        send_main_menu(call.message.chat.id, user_id)
+
+    elif data == 'unlock_bot':
+        bot_locked = False
+        bot.answer_callback_query(call.id, "🔓 Bot Unlocked! Users can upload again.", show_alert=True)
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        send_main_menu(call.message.chat.id, user_id)
+
+    # --- File Management Handlers ---
+    elif data == 'check_files':
         user_files_list = user_files.get(user_id, [])
         if not user_files_list:
             bot.answer_callback_query(call.id, "⚠️ No files uploaded.", show_alert=True)
@@ -478,7 +514,6 @@ def handle_callbacks(call):
             markup.add(types.InlineKeyboardButton(btn_text, callback_data=f'file_{user_id}_{file_name}'))
         markup.add(types.InlineKeyboardButton("🔙 Back to Main", callback_data='back_to_main'))
         
-        # We delete the original message and send a text one to avoid Video/Text edit conflicts
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, "📂 **Your files:**", reply_markup=markup, parse_mode="Markdown")
     
@@ -499,6 +534,13 @@ def handle_callbacks(call):
         user_folder = get_user_folder(script_owner_id)
         file_path = os.path.join(user_folder, file_name)
         bot.answer_callback_query(call.id, f"⏳ Starting {file_name}...")
+        
+        bot.edit_message_text(
+            f"⚙️ Controls for: `{file_name}`\nStatus: 🟢 Running",
+            call.message.chat.id, call.message.message_id,
+            reply_markup=create_control_buttons(script_owner_id_str, file_name, is_running=True), parse_mode='Markdown'
+        )
+
         if file_name.endswith('.py'):
             threading.Thread(target=run_script, args=(file_path, script_owner_id, user_folder, file_name, call.message)).start()
         elif file_name.endswith('.js'):
@@ -511,10 +553,35 @@ def handle_callbacks(call):
         if script_key in bot_scripts:
             kill_process_tree(bot_scripts[script_key])
             del bot_scripts[script_key]
+            bot.edit_message_text(
+                f"⚙️ Controls for: `{file_name}`\nStatus: 🔴 Stopped",
+                call.message.chat.id, call.message.message_id,
+                reply_markup=create_control_buttons(script_owner_id_str, file_name, is_running=False), parse_mode='Markdown'
+            )
+
+    elif data.startswith('delete_'):
+        _, script_owner_id_str, file_name = call.data.split('_', 2)
+        script_owner_id = int(script_owner_id_str)
+        script_key = f"{script_owner_id_str}_{file_name}"
+        
+        bot.answer_callback_query(call.id, f"🗑️ Deleting {file_name}...")
+        
+        # Stop it if it's running
+        if script_key in bot_scripts:
+            kill_process_tree(bot_scripts[script_key])
+            del bot_scripts[script_key]
+            
+        # Delete from database and file system
+        remove_user_file_db(script_owner_id, file_name)
+        file_path = os.path.join(get_user_folder(script_owner_id), file_name)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, f"✅ `{file_name}` has been deleted.", parse_mode="Markdown")
 
     elif data == 'back_to_main':
         bot.answer_callback_query(call.id)
-        # Delete the current text message and resend the main menu (which includes the video)
         bot.delete_message(call.message.chat.id, call.message.message_id)
         send_main_menu(call.message.chat.id, user_id)
 

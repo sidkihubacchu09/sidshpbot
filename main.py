@@ -326,6 +326,8 @@ def create_control_buttons(script_owner_id, file_name, is_running=True):
                    types.InlineKeyboardButton("🔄 Restart", callback_data=f'restart_{script_owner_id}_{file_name}'))
         markup.row(types.InlineKeyboardButton("🗑️ Delete", callback_data=f'delete_{script_owner_id}_{file_name}'),
                    types.InlineKeyboardButton("📜 Logs", callback_data=f'logs_{script_owner_id}_{file_name}'))
+        # IMPORTANT: Button to send OTP/Password to userbots
+        markup.row(types.InlineKeyboardButton("⌨️ Send Input (OTP/Pass)", callback_data=f'input_{script_owner_id}_{file_name}'))
     else:
         markup.row(types.InlineKeyboardButton("🟢 Start", callback_data=f'start_{script_owner_id}_{file_name}'),
                    types.InlineKeyboardButton("🗑️ Delete", callback_data=f'delete_{script_owner_id}_{file_name}'))
@@ -346,6 +348,24 @@ def send_main_menu(chat_id, user_id):
         if user_id in admin_ids:
             caption_text += "\n\n*(Admin Tip: Send any video with the caption `/setvideo` to display a video here!)*"
         bot.send_message(chat_id, caption_text, reply_markup=inline_markup, parse_mode="Markdown")
+
+# --- Userbot Terminal Interactor Function ---
+def process_script_input(message, script_key):
+    """Takes user text from telegram and types it into the running terminal."""
+    if script_key in bot_scripts:
+        process = bot_scripts[script_key].get('process')
+        if process and process.poll() is None: # Process is still running
+            try:
+                input_data = message.text + "\n"
+                process.stdin.write(input_data.encode('utf-8'))
+                process.stdin.flush()
+                bot.reply_to(message, "✅ Input sent to the terminal! Click '📜 Logs' to see the result.")
+            except Exception as e:
+                bot.reply_to(message, f"❌ Failed to send input: {e}")
+        else:
+            bot.reply_to(message, "⚠️ Script is no longer running.")
+    else:
+        bot.reply_to(message, "⚠️ Script not found or has been stopped.")
 
 # --- Admin Command to Set the Video ---
 @bot.message_handler(content_types=['video'])
@@ -372,7 +392,7 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
     try:
         log_file_path = os.path.join(user_folder, f"{os.path.splitext(file_name)[0]}.log")
         log_file = open(log_file_path, 'w', encoding='utf-8', errors='ignore')
-        process = subprocess.Popen([sys.executable, script_path], cwd=user_folder, stdout=log_file, stderr=log_file, stdin=subprocess.PIPE)
+        process = subprocess.Popen([sys.executable, script_path], cwd=user_folder, stdout=log_file, stderr=log_file, stdin=subprocess.PIPE, bufsize=0)
         bot_scripts[script_key] = {
             'process': process, 'log_file': log_file, 'file_name': file_name,
             'chat_id': message_obj_for_reply.chat.id, 'script_owner_id': script_owner_id,
@@ -386,7 +406,7 @@ def run_js_script(script_path, script_owner_id, user_folder, file_name, message_
     try:
         log_file_path = os.path.join(user_folder, f"{os.path.splitext(file_name)[0]}.log")
         log_file = open(log_file_path, 'w', encoding='utf-8', errors='ignore')
-        process = subprocess.Popen(['node', script_path], cwd=user_folder, stdout=log_file, stderr=log_file, stdin=subprocess.PIPE)
+        process = subprocess.Popen(['node', script_path], cwd=user_folder, stdout=log_file, stderr=log_file, stdin=subprocess.PIPE, bufsize=0)
         bot_scripts[script_key] = {
             'process': process, 'log_file': log_file, 'file_name': file_name,
             'chat_id': message_obj_for_reply.chat.id, 'script_owner_id': script_owner_id,
@@ -484,7 +504,7 @@ def handle_callbacks(call):
 
     # --- Handlers for Admin buttons ---
     elif data in ['subscription', 'broadcast', 'admin_panel', 'run_all_scripts']:
-        bot.answer_callback_query(call.id, "👑 Admin feature is under construction!", show_alert=True)
+        bot.answer_callback_query(call.id, "👑 Admin feature is active but logic is empty. Edit script to add functionality.", show_alert=True)
 
     elif data == 'lock_bot':
         global bot_locked
@@ -579,6 +599,60 @@ def handle_callbacks(call):
             
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, f"✅ `{file_name}` has been deleted.", parse_mode="Markdown")
+
+    elif data.startswith('restart_'):
+        _, script_owner_id_str, file_name = call.data.split('_', 2)
+        script_key = f"{script_owner_id_str}_{file_name}"
+        script_owner_id = int(script_owner_id_str)
+        bot.answer_callback_query(call.id, f"🔄 Restarting {file_name}...")
+        
+        # Stop
+        if script_key in bot_scripts:
+            kill_process_tree(bot_scripts[script_key])
+            del bot_scripts[script_key]
+        
+        # Start
+        user_folder = get_user_folder(script_owner_id)
+        file_path = os.path.join(user_folder, file_name)
+        if file_name.endswith('.py'):
+            threading.Thread(target=run_script, args=(file_path, script_owner_id, user_folder, file_name, call.message)).start()
+        elif file_name.endswith('.js'):
+            threading.Thread(target=run_js_script, args=(file_path, script_owner_id, user_folder, file_name, call.message)).start()
+
+    # --- Userbot: Logs & Input Terminal ---
+    elif data.startswith('logs_'):
+        _, script_owner_id_str, file_name = call.data.split('_', 2)
+        user_folder = get_user_folder(int(script_owner_id_str))
+        log_path = os.path.join(user_folder, f"{os.path.splitext(file_name)[0]}.log")
+        
+        if os.path.exists(log_path):
+            with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()
+                # Get the last 20 lines to see if it's asking for OTP
+                last_lines = "".join(lines[-20:]) if lines else "Log file is currently empty."
+            bot.answer_callback_query(call.id)
+            bot.send_message(call.message.chat.id, f"📜 **Terminal Logs for {file_name}:**\n\n```text\n{last_lines}\n```", parse_mode="Markdown")
+        else:
+            bot.answer_callback_query(call.id, "⚠️ No logs found.", show_alert=True)
+            
+    elif data.startswith('input_'):
+        _, script_owner_id_str, file_name = call.data.split('_', 2)
+        script_key = f"{script_owner_id_str}_{file_name}"
+        
+        if script_key in bot_scripts and is_bot_running(int(script_owner_id_str), file_name):
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(
+                call.message.chat.id, 
+                f"⌨️ **Send Terminal Input for `{file_name}`**\n\n"
+                "Please type your **Phone Number**, **OTP**, or **Password** in the chat below. "
+                "(Check 'Logs' first to see what the script is asking for).\n\n"
+                "*Waiting for your next message...*", 
+                parse_mode="Markdown"
+            )
+            # Wait for user's next message and send it to the script
+            bot.register_next_step_handler(msg, process_script_input, script_key)
+        else:
+            bot.answer_callback_query(call.id, "⚠️ Script must be running to receive input!", show_alert=True)
 
     elif data == 'back_to_main':
         bot.answer_callback_query(call.id)

@@ -2,26 +2,16 @@
 import telebot
 import subprocess
 import os
-import zipfile
-import tempfile
-import shutil
-from telebot import types
-import time
-from datetime import datetime, timedelta
-import psutil
 import sqlite3
-import json
 import logging
-import signal
 import threading
-import re
 import sys
 import atexit
-import requests
-import hashlib
-import mimetypes
-import struct
-from flask import Flask, send_file, redirect
+import time
+from datetime import datetime
+import psutil
+from telebot import types
+from flask import Flask
 from threading import Thread
 
 # --- Configuration ---
@@ -31,18 +21,11 @@ ADMIN_ID = 2119464081
 YOUR_USERNAME = '@Xricx0' 
 UPDATE_CHANNEL = 'https://t.me/+5uCnxp3U1gMwZjQ1'
 
-# ⚠️ IMPORTANT: Change this to your actual server/hosting URL!
-# Example: "https://my-hosting-bot.username.repl.co"
-HOSTING_DOMAIN = "https://your-server-url.com" 
-
 # Folder setup - using absolute paths
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_BOTS_DIR = os.path.join(BASE_DIR, 'upload_bots')
 IROTECH_DIR = os.path.join(BASE_DIR, 'inf')
 DATABASE_PATH = os.path.join(IROTECH_DIR, 'bot_data.db')
-
-# Path where the bot will save the uploaded video
-MENU_VIDEO_PATH = os.path.join(BASE_DIR, 'menu_video.mp4')
 
 # File upload limits
 FREE_USER_LIMIT = 10
@@ -57,71 +40,12 @@ os.makedirs(IROTECH_DIR, exist_ok=True)
 # Initialize bot
 bot = telebot.TeleBot(TOKEN)
 
-# --- Flask Keep Alive & Web App ---
+# --- Flask Keep Alive ---
 app = Flask('')
 
 @app.route('/')
 def home():
     return "Bot is running securely...."
-
-@app.route('/menu_video.mp4')
-def serve_menu_video():
-    """Serves the actual video file to the dashboard"""
-    if os.path.exists(MENU_VIDEO_PATH):
-        return send_file(MENU_VIDEO_PATH, mimetype='video/mp4')
-    else:
-        # Fallback default video if the owner hasn't uploaded one yet
-        return redirect("https://www.w3schools.com/html/mov_bbb.mp4")
-
-@app.route('/webapp')
-def webapp():
-    """The visually attractive Web App dashboard with the video frame"""
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script src="https://telegram.org/js/telegram-web-app.js"></script>
-        <style>
-            body {{ 
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-                background-color: var(--tg-theme-bg-color, #1e1e1e); 
-                color: var(--tg-theme-text-color, #ffffff); 
-                margin: 0; padding: 0; text-align: center; 
-            }}
-            .video-container {{ 
-                width: 100%; height: 220px; background: #000; 
-                border-bottom: 3px solid var(--tg-theme-button-color, #3390ec);
-            }}
-            video {{ width: 100%; height: 100%; object-fit: cover; }}
-            .content {{ padding: 25px; }}
-            h2 {{ margin-top: 0; color: var(--tg-theme-button-color, #3390ec); }}
-            .btn {{ 
-                background-color: var(--tg-theme-button-color, #3390ec); 
-                color: var(--tg-theme-button-text-color, #fff); 
-                border: none; padding: 14px 24px; border-radius: 8px; 
-                font-size: 16px; font-weight: bold; cursor: pointer; width: 80%;
-                margin-top: 20px;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="video-container">
-            <video src="/menu_video.mp4" autoplay loop muted playsinline></video>
-        </div>
-        <div class="content">
-            <h2>✨ Hosting Dashboard ✨</h2>
-            <p>Welcome to the advanced control panel. Manage your scripts securely.</p>
-            <button class="btn" onclick="Telegram.WebApp.close()">Close Menu</button>
-        </div>
-        <script>
-            Telegram.WebApp.ready();
-            Telegram.WebApp.expand();
-        </script>
-    </body>
-    </html>
-    """
-    return html
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -131,7 +55,7 @@ def keep_alive():
     t = Thread(target=run_flask)
     t.daemon = True
     t.start()
-    print("Flask Web Server & Keep-Alive started.")
+    print("Flask Keep-Alive started.")
 # --- End Flask Keep Alive ---
 
 # --- Data structures ---
@@ -184,6 +108,7 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS user_files (user_id INTEGER, file_name TEXT, file_type TEXT, PRIMARY KEY (user_id, file_name))''')
         c.execute('''CREATE TABLE IF NOT EXISTS active_users (user_id INTEGER PRIMARY KEY)''')
         c.execute('''CREATE TABLE IF NOT EXISTS admins (user_id INTEGER PRIMARY KEY)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)''')
         c.execute('INSERT OR IGNORE INTO admins (user_id) VALUES (?)', (OWNER_ID,))
         if ADMIN_ID != OWNER_ID:
             c.execute('INSERT OR IGNORE INTO admins (user_id) VALUES (?)', (ADMIN_ID,))
@@ -242,6 +167,23 @@ def remove_user_file_db(user_id, file_name):
                 user_files[user_id] = [f for f in user_files[user_id] if f[0] != file_name]
         except Exception as e: logger.error(f"Error removing file: {e}")
         finally: conn.close()
+
+def save_menu_video_id(file_id):
+    with DB_LOCK:
+        conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+        c = conn.cursor()
+        c.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ('menu_video_id', file_id))
+        conn.commit()
+        conn.close()
+
+def get_menu_video_id():
+    with DB_LOCK:
+        conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+        c = conn.cursor()
+        c.execute('SELECT value FROM settings WHERE key = ?', ('menu_video_id',))
+        result = c.fetchone()
+        conn.close()
+        return result[0] if result else None
 
 # --- Malware Detection Functions ---
 def get_file_type(file_content):
@@ -337,9 +279,7 @@ def kill_process_tree(process_info):
 # --- Menu creation ---
 def create_main_menu_inline(user_id):
     markup = types.InlineKeyboardMarkup(row_width=2)
-    web_app_url = f"{HOSTING_DOMAIN}/webapp"
     buttons = [
-        types.InlineKeyboardButton('📱 Open Visual Dashboard', web_app=types.WebAppInfo(url=web_app_url)),
         types.InlineKeyboardButton('📢 Updates Channel', url=UPDATE_CHANNEL),
         types.InlineKeyboardButton('📤 Upload File', callback_data='upload'),
         types.InlineKeyboardButton('📂 Check Files', callback_data='check_files'),
@@ -356,23 +296,21 @@ def create_main_menu_inline(user_id):
                                      callback_data='lock_bot' if not bot_locked else 'unlock_bot'),
             types.InlineKeyboardButton('📢 Broadcast', callback_data='broadcast'),
             types.InlineKeyboardButton('👑 Admin Panel', callback_data='admin_panel'),
-            types.InlineKeyboardButton('🟢 Run All User Scripts', callback_data='run_all_scripts')
+            types.InlineKeyboardButton('🟢 Run All Scripts', callback_data='run_all_scripts')
         ]
-        markup.add(buttons[0]) 
-        markup.add(buttons[1])
-        markup.add(buttons[2], buttons[3])
-        markup.add(buttons[4], buttons[5])
+        markup.add(buttons[0])
+        markup.add(buttons[1], buttons[2])
+        markup.add(buttons[3], buttons[4])
         markup.add(admin_buttons[0], admin_buttons[1])
         markup.add(admin_buttons[3], admin_buttons[4])
         markup.add(admin_buttons[2], admin_buttons[5])
-        markup.add(buttons[6])
+        markup.add(buttons[5])
     else:
-        markup.add(buttons[0]) 
-        markup.add(buttons[1])
-        markup.add(buttons[2], buttons[3])
-        markup.add(buttons[4], buttons[5])
+        markup.add(buttons[0])
+        markup.add(buttons[1], buttons[2])
+        markup.add(buttons[3], buttons[4])
         markup.add(types.InlineKeyboardButton('📊 Statistics', callback_data='stats'))
-        markup.add(buttons[6])
+        markup.add(buttons[5])
     return markup
 
 def create_reply_keyboard_main_menu(user_id):
@@ -395,27 +333,31 @@ def create_control_buttons(script_owner_id, file_name, is_running=True):
     markup.add(types.InlineKeyboardButton("🔙 Back to Files", callback_data='check_files'))
     return markup
 
-# --- Admin Command to Set the Video via File Upload ---
+def send_main_menu(chat_id, user_id):
+    """Helper function to send the main menu (with or without video)"""
+    inline_markup = create_main_menu_inline(user_id)
+    video_id = get_menu_video_id()
+    
+    caption_text = "✨ **Welcome to Hosting Bot!** ✨\nChoose an option below to manage your scripts securely."
+    
+    if video_id:
+        bot.send_video(chat_id, video_id, caption=caption_text, reply_markup=inline_markup, parse_mode="Markdown")
+    else:
+        if user_id in admin_ids:
+            caption_text += "\n\n*(Admin Tip: Send any video with the caption `/setvideo` to display a video here!)*"
+        bot.send_message(chat_id, caption_text, reply_markup=inline_markup, parse_mode="Markdown")
+
+# --- Admin Command to Set the Video ---
 @bot.message_handler(content_types=['video'])
 def handle_menu_video_upload(message):
-    """Allows the owner to upload an actual video file for the Web App menu."""
+    """Allows the owner/admin to upload a video that will appear in the main menu."""
     user_id = message.from_user.id
     if user_id in admin_ids and message.caption and message.caption.strip().lower() == '/setvideo':
-        if message.video.file_size > 20 * 1024 * 1024:
-            bot.reply_to(message, "⚠️ Video is too large! Please upload an MP4 under 20MB.")
-            return
         try:
-            wait_msg = bot.reply_to(message, "⏳ Downloading and setting your new menu video. Please wait...")
-            file_info = bot.get_file(message.video.file_id)
-            downloaded_file = bot.download_file(file_info.file_path)
-            
-            with open(MENU_VIDEO_PATH, 'wb') as new_file:
-                new_file.write(downloaded_file)
-                
-            bot.edit_message_text("✅ Video successfully uploaded and set! Open your Dashboard menu to see it.", 
-                                  chat_id=message.chat.id, message_id=wait_msg.message_id)
+            save_menu_video_id(message.video.file_id)
+            bot.reply_to(message, "✅ Menu video successfully set! It will now appear above the main menu.")
         except Exception as e:
-            bot.edit_message_text(f"❌ Failed to process video: {e}", chat_id=message.chat.id, message_id=wait_msg.message_id)
+            bot.reply_to(message, f"❌ Failed to set video: {e}")
 
 # --- Automatic Package Installation & Script Running ---
 def attempt_install_pip(module_name, message):
@@ -466,9 +408,8 @@ def command_send_welcome(message):
         conn.commit(); conn.close()
 
     main_reply_markup = create_reply_keyboard_main_menu(user_id)
-    inline_markup = create_main_menu_inline(user_id)
-    bot.send_message(chat_id, "Welcome to Hosting Bot!", reply_markup=main_reply_markup)
-    bot.send_message(chat_id, "Choose an option below:", reply_markup=inline_markup)
+    bot.send_message(chat_id, "Generating Hosting Panel...", reply_markup=main_reply_markup)
+    send_main_menu(chat_id, user_id)
 
 @bot.message_handler(content_types=['document'])
 def handle_file_upload_doc(message):
@@ -536,7 +477,10 @@ def handle_callbacks(call):
             btn_text = f"{file_name} ({file_type}) - {status_icon}"
             markup.add(types.InlineKeyboardButton(btn_text, callback_data=f'file_{user_id}_{file_name}'))
         markup.add(types.InlineKeyboardButton("🔙 Back to Main", callback_data='back_to_main'))
-        bot.edit_message_text("📂 Your files:", call.message.chat.id, call.message.message_id, reply_markup=markup)
+        
+        # We delete the original message and send a text one to avoid Video/Text edit conflicts
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, "📂 **Your files:**", reply_markup=markup, parse_mode="Markdown")
     
     elif data.startswith('file_'):
         _, script_owner_id_str, file_name = call.data.split('_', 2)
@@ -570,7 +514,9 @@ def handle_callbacks(call):
 
     elif data == 'back_to_main':
         bot.answer_callback_query(call.id)
-        bot.edit_message_text("Main Menu:", call.message.chat.id, call.message.message_id, reply_markup=create_main_menu_inline(user_id))
+        # Delete the current text message and resend the main menu (which includes the video)
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        send_main_menu(call.message.chat.id, user_id)
 
 def cleanup():
     for key in list(bot_scripts.keys()):

@@ -3,269 +3,381 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SID HOSTING</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>Enterprise Bot Node Controller</title>
+    <style>
+        :root { --bg: #0f172a; --glass: rgba(30, 41, 59, 0.7); --border: rgba(255,255,255,0.1); --text: #f8fafc; --text-muted: #94a3b8; --accent: #38bdf8; }
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 24px; }
+        .glass-nav { display: flex; gap: 16px; background: var(--glass); padding: 12px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 24px; }
+        .nav-item { padding: 8px 16px; border-radius: 6px; cursor: pointer; color: var(--text-muted); transition: all 0.2s; }
+        .nav-item.active, .nav-item:hover { background: var(--accent); color: var(--bg); font-weight: bold; }
+        .view-section { background: var(--glass); border-radius: 16px; border: 1px solid var(--border); padding: 24px; min-height: 300px; }
+        .hidden { display: none !important; }
+        .file-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 12px; }
+        .file-name { font-weight: bold; color: var(--accent); }
+        .file-status { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+        .action-btn { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; margin-left: 6px; }
+        .action-btn:hover { background: rgba(255,255,255,0.05); }
+        .action-btn.danger { border-color: rgba(ef, 68, 68, 0.4); color: #f87171; }
+        .action-btn.danger:hover { background: rgba(239, 68, 68, 0.1); }
+        input, textarea { width: 100%; max-width: 500px; padding: 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 6px; color: #fff; margin-bottom: 16px; font-family: monospace; box-sizing: border-box; }
+        textarea { max-width: 100%; height: 200px; }
+        button.primary { background: var(--accent); color: var(--bg); font-weight: bold; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+        #terminal-modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 999; }
+        .terminal-box { width: 90%; max-width: 800px; height: 500px; background: #000; border: 1px solid var(--accent); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
+        .terminal-header { background: #1e293b; padding: 12px; display: flex; justify-content: space-between; font-family: monospace; font-size: 14px; }
+        #terminal-output { flex: 1; padding: 16px; overflow-y: auto; font-family: monospace; font-size: 13px; line-height: 1.5; color: #34d399; background: #050505; }
+        .log-line { margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 2px; }
+    </style>
 </head>
 <body>
 
-    <div class="video-bg-container">
-        <video id="bg-video" autoplay loop muted playsinline>
-            <source src="https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4" type="video/mp4">
-        </video>
-        <div class="video-overlay"></div>
+    <div class="glass-nav">
+        <div class="nav-item active" onclick="nav.switchTab('view-deploy', this)">🚀 Deploy Engine</div>
+        <div class="nav-item" onclick="nav.switchTab('view-files', this)">🗄️ Thread Dashboard</div>
+        <div class="nav-item" onclick="nav.switchTab('view-settings', this)">⚙️ Settings Panel</div>
     </div>
 
-    <div class="app-container" id="main-app">
+    <div id="view-deploy" class="view-section">
+        <h2>Deploy Script Environment</h2>
+        <hr style="border-color: var(--border); margin-bottom: 20px;">
 
-        <div id="view-deploy" class="view-section active">
-            <div class="glass-panel" id="step1-script">
-                <div class="panel-header"><h2 class="gradient-text">Deploy Bot</h2></div>
-                <p class="status-text">Enter credentials and write/upload your Python script.</p>
-                
-                <input type="tel" id="phoneInput" class="glass-input" placeholder="Phone Number (e.g. +1234567890)" autocomplete="off">
-                
-                <div class="code-editor-wrapper">
-                    <div class="editor-header">
-                        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
-                        <span class="filename" id="filename-display">main.py</span>
-                    </div>
-                    <textarea id="scriptInput" spellcheck="false" placeholder="from telethon import TelegramClient..."></textarea>
-                </div>
+        <div id="step1-script">
+            <h3>Step 1: Resource Payload Allocator</h3>
+            <label style="display:block; margin-bottom:6px;">Upload Native Code File:</label>
+            <input type="file" accept=".py,.txt" onchange="deployFlow.handleFileUpload(event)"><br>
+            
+            <label style="display:block; margin-bottom:6px;">Target File Designation Name:</label>
+            <input type="text" id="targetFileNameDisplay" value="main.py" placeholder="script_name.py"><br>
 
-                <div class="btn-group">
-                    <input type="file" id="fileUpload" accept=".py,.txt" style="display: none;" onchange="deployFlow.handleFileUpload(event)">
-                    <button class="secondary-btn btn-animate" onclick="document.getElementById('fileUpload').click()">
-                        📤 Upload Script
-                    </button>
-                    <button class="primary-btn btn-animate" id="btn-deploy" onclick="deployFlow.nextToOTP()">
-                        <span class="btn-text">Connect Node</span>
-                        <div class="spinner"></div>
-                    </button>
-                </div>
-            </div>
+            <label style="display:block; margin-bottom:6px;">Raw Source Execution Script Area:</label>
+            <textarea id="scriptInput" placeholder="import time&#10;while True:&#10;    print('Userbot heartbeat active...')&#10;    time.sleep(3)"></textarea><br>
 
-            <div class="glass-panel hidden" id="step2-otp">
-                <div class="panel-header"><h2>Verify Connection</h2></div>
-                <p class="status-text" id="otp-phone-display">We sent a login code to your Telegram app.</p>
-                <input type="number" id="otpInput" class="glass-input text-center" placeholder="• • • • •" autocomplete="off">
-                <button class="primary-btn btn-animate" id="btn-otp" onclick="deployFlow.nextToPassword()">
-                    <span class="btn-text">Verify Code</span>
-                    <div class="spinner"></div>
-                </button>
-                <button class="secondary-btn btn-animate mt-10" onclick="deployFlow.goBack('step2-otp', 'step1-script')">Cancel</button>
-            </div>
+            <label style="display:block; margin-bottom:6px;">Telephony Phone Routing Node Address:</label>
+            <input type="text" id="phoneInput" placeholder="+1234567890">
+            <p style="font-size:12px; color:var(--text-muted);">Enter structural context configurations to associate processing instances.</p>
 
-            <div class="glass-panel hidden" id="step3-password">
-                <div class="panel-header"><h2>2-Step Verification</h2></div>
-                <p class="status-text">Enter your Cloud Password to decrypt the session.</p>
-                <input type="password" id="passwordInput" class="glass-input text-center" placeholder="Cloud Password">
-                <button class="primary-btn btn-animate" id="btn-pass" onclick="deployFlow.finalize()">
-                    <span class="btn-text">Unlock & Deploy</span>
-                    <div class="spinner"></div>
-                </button>
-            </div>
-
-            <div class="glass-panel hidden text-center" id="step4-success">
-                <div class="success-ring"><span class="success-check">✓</span></div>
-                <h2 class="gradient-text">Deployment Active</h2>
-                <p class="status-text mt-10">Your script is now securely running continuously on the cloud node.</p>
-                <button class="primary-btn btn-animate mt-20" onclick="nav.switchTab('view-files', document.querySelector('.nav-item:nth-child(2)'))">Go to Bot Dashboard</button>
-                <button class="secondary-btn btn-animate mt-10" onclick="deployFlow.reset()">Deploy Another Script</button>
-            </div>
+            <button class="primary" onclick="deployFlow.nextToOTP()">Compile and Advance &raquo;</button>
         </div>
 
-        <div id="view-files" class="view-section hidden">
-            <div class="glass-panel">
-                <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2>Your Bots</h2>
-                    <span id="bot-running-counter" style="font-size: 0.8rem; background: rgba(39, 201, 63, 0.2); color: #27c93f; padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(39, 201, 63, 0.4); font-weight: bold;">🟢 1 / 2 Running</span>
-                </div>
-                <p class="status-text">Manage your hosted userbot processes.</p>
-                <div id="bots-list-container"></div>
-            </div>
+        <div id="step2-otp" class="hidden">
+            <h3>Step 2: Security Verification Authorization Packet</h3>
+            <p>Enter network code packet identifier sent to routing cluster structure.</p>
+            <input type="text" id="otpInput" placeholder="Enter Token (e.g., 12345)"><br>
+            <button class="primary" onclick="deployFlow.nextToPassword()">Validate Credentials &raquo;</button>
+            <button class="action-btn" onclick="deployFlow.goBack('step2-otp', 'step1-script')">Back</button>
         </div>
 
-        <div id="terminal-modal" class="modal-overlay hidden">
-            <div class="terminal-container">
-                <div class="terminal-header">
-                    <div class="terminal-title">
-                        <span class="dot red" onclick="terminal.close()"></span>
-                        <span class="dot yellow"></span>
-                        <span class="dot green"></span>
-                        <span id="terminal-bot-name">terminal_process</span>
-                    </div>
-                    <span class="close-btn" onclick="terminal.close()">✖</span>
-                </div>
-                <div class="terminal-body" id="terminal-output"></div>
-            </div>
+        <div id="step3-password" class="hidden">
+            <h3>Step 3: Verification Passphrase Access Confirmation</h3>
+            <p>Assign administrative access profile configuration passphrase to complete mounting protocol.</p>
+            <input type="password" id="passwordInput" placeholder="Profile Password"><br>
+            <button class="primary" id="btn-pass" onclick="deployFlow.finalize()">Authorize Pipeline Provision &raquo;</button>
+            <button class="action-btn" onclick="deployFlow.goBack('step3-password', 'step2-otp')">Back</button>
         </div>
 
-        <div id="view-settings" class="view-section hidden">
-            <div class="glass-panel" style="margin-bottom: 20px;">
-                <div class="panel-header"><h2>Account Dashboard</h2></div>
-                <div style="background: rgba(0, 0, 0, 0.4); padding: 15px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); margin-top: 15px; text-align: left;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <span style="color: #ccc;">Account Status:</span>
-                        <span id="settings-account-status" style="color: #fff; font-weight: bold;">Standard (Free)</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                        <span style="color: #ccc;">Wallet Balance:</span>
-                        <span id="settings-wallet-balance" style="color: #27c93f; font-weight: bold;">$0.00</span>
-                    </div>
-                        💎 Upgrade to Premium
-                    </button>
-                </div>
-            </div>
-
-            <div class="glass-panel">
-                <div class="panel-header"><h2>Preferences</h2></div>
-                <div class="mt-20">
-                    <p style="margin-bottom: 12px; font-size: 0.9rem; color: #ccc;">Background UI Skin Engine</p>
-                    <input type="file" id="video-url-input" accept="video/*" style="display: none;" onchange="updateBackgroundFromSettings(event)">
-                    <button class="secondary-btn btn-animate" style="width: 100%;" onclick="document.getElementById('video-url-input').click()">
-                        🎬 Upload New Background Video
-                    </button>
-                    <div id="settings-video-status" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 8px; text-align: center;">Using system default video loop</div>
-                </div>
-            </div>
+        <div id="step4-success" class="hidden" style="text-align: center; padding: 40px 0;">
+            <h2 style="color: #34d399;">🎉 Environment Allocation Secure</h2>
+            <p>Script compiled cleanly and integrated straight to backend runtime processes thread pool.</p>
+            <button class="primary" onclick="deployFlow.reset()">Deploy Another Asset Node</button>
         </div>
-
-        <div id="view-admin" class="view-section hidden">
-            <div class="glass-panel text-center" id="admin-login-panel">
-                <div class="panel-header" style="justify-content: center;"><h2 class="gradient-text">Admin Portal</h2></div>
-                <p class="status-text">Restricted Area. Authentication required.</p>
-                <input type="password" id="adminPassInput" class="glass-input text-center" placeholder="Admin Password">
-                <button class="primary-btn btn-animate" id="btn-admin-login" onclick="verifyAdminPassword()">
-                    <span class="btn-text">Access Core</span>
-                    <div class="spinner"></div>
-                </button>
-            </div>
-
-            <div class="glass-panel hidden" id="admin-dash-panel">
-                <div class="panel-header">
-                    <h2 class="gradient-text">Server Core</h2>
-                </div>
-                <p class="status-text" id="server-status-text" style="color: #27c93f;"><span class="pulse status-dot green" style="display:inline-block; font-size:0.8rem; margin-right:5px;">●</span>Node is online (Ping: 12ms)</p>
-                
-                <div class="admin-stats-grid" style="margin-top: 15px;">
-                    <div class="stat-card">
-                        <div class="stat-value">14</div>
-                        <div class="stat-label">Active Bots</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">89%</div>
-                        <div class="stat-label">CPU Load</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">1,204</div>
-                        <div class="stat-label">Total Users</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" style="color: #27c93f;">$345.00</div>
-                        <div class="stat-label">Payments (24h)</div>
-                    </div>
-                </div>
-
-                <div style="background: rgba(0, 0, 0, 0.4); padding: 15px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); margin-top: 15px; text-align: left;">
-                    <p style="color: #fff; margin-bottom: 10px; font-weight: bold; font-size: 0.9rem;">Server Power Switch</p>
-                    <div style="display: flex; gap: 10px;">
-                        <button class="action-btn" style="flex: 1; color: #27c93f; border-color: rgba(39,201,63,0.4); background: rgba(39,201,63,0.1);" onclick="toggleServerPower(true)">▶ Power ON</button>
-                        <button class="action-btn danger" style="flex: 1;" onclick="toggleServerPower(false)">⏹ Power OFF</button>
-                    </div>
-                </div>
-
-                <div style="background: rgba(0, 0, 0, 0.4); padding: 15px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); margin-top: 15px; margin-bottom: 15px; text-align: left;">
-                    <p style="color: #fff; margin-bottom: 10px; font-weight: bold; font-size: 0.9rem;">Change Web Background Video</p>
-                    <input type="file" id="admin-video-url-input" accept="video/*" style="display: none;" onchange="updateBackgroundFromAdmin(event)">
-                    <button class="secondary-btn btn-animate" style="width: 100%; border-color: rgba(255,255,255,0.2);" onclick="document.getElementById('admin-video-url-input').click()">
-                        🎬 Upload Background Video
-                    </button>
-                    <div id="admin-video-status" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 8px; text-align: center;">Using system default video loop</div>
-                </div>
-
-                <button class="secondary-btn admin-logout-btn btn-animate" onclick="logoutAdmin()">Secure Logout</button>
-            </div>
-        </div>
-
     </div>
 
-    <nav class="glass-nav">
-        <div class="nav-item active" onclick="nav.switchTab('view-deploy', this)">
-            <span class="nav-icon">☁️</span><span class="nav-label">Deploy</span>
+    <div id="view-files" class="view-section hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0;">Hosted Cloud Processing Instances</h2>
+            <span id="bot-running-counter" style="font-size: 14px; color: var(--accent); background: rgba(56,189,248,0.1); padding: 6px 12px; border-radius: 20px;">🟢 0 Deployed Threads Active</span>
         </div>
-        <div class="nav-item" onclick="nav.switchTab('view-files', this)">
-            <span class="nav-icon">🤖</span><span class="nav-label">My Bots</span>
+        <hr style="border-color: var(--border); margin-bottom: 20px;">
+        <div id="bots-list-container"></div>
+    </div>
+
+    <div id="view-settings" class="view-section hidden">
+        <h2>System Profile Configuration Controls</h2>
+        <hr style="border-color: var(--border); margin-bottom: 20px;">
+        <p>Account Status: <strong id="settings-account-status">Standard (Free)</strong></p>
+        <p>Network Wallet Resource Allocation: <strong id="settings-wallet-balance" style="color: var(--accent);">$0.00</strong></p>
+        <button class="primary" id="settings-upgrade-btn" onclick="appSettings.purchasePremium()">Upgrade to Premium Pro Cluster</button>
+    </div>
+
+    <div id="terminal-modal" class="hidden">
+        <div class="terminal-box">
+            <div class="terminal-header">
+                <span id="terminal-bot-name">runtime_stream::initializing...</span>
+                <span style="cursor:pointer; color:#ef4444; font-weight:bold;" onclick="terminal.close()">[❌ CLOSE]</span>
+            </div>
+            <div id="terminal-output"></div>
         </div>
-        <div class="nav-item" onclick="nav.switchTab('view-settings', this)">
-            <span class="nav-icon">⚙️</span><span class="nav-label">Settings</span>
-        </div>
-        <div class="nav-item" onclick="nav.switchTab('view-admin', this)">
-            <span class="nav-icon">🛡️</span><span class="nav-label">Admin</span>
-        </div>
-    </nav>
+    </div>
 
     <script>
-        function verifyAdminPassword() {
-            const pass = document.getElementById('adminPassInput').value;
-            if (pass === 'sid999') {
-                document.getElementById('admin-login-panel').classList.add('hidden');
-                document.getElementById('admin-dash-panel').classList.remove('hidden');
-                document.getElementById('adminPassInput').value = '';
-            } else {
-                alert('Access Denied. Incorrect Admin Password.');
+        // Data Base Initialization Configuration Hooks
+        if (!localStorage.getItem('sid_initialized')) {
+            localStorage.setItem('sid_bots', JSON.stringify([]));
+            localStorage.setItem('sid_wallet', '0.00');
+            localStorage.setItem('sid_premium', 'false');
+            localStorage.setItem('sid_initialized', 'true');
+        }
+
+        function updateStoredBots(bots) {
+            localStorage.setItem('sid_bots', JSON.stringify(bots));
+            renderBotDashboard();
+        }
+
+        function calculateUptime(startTime) {
+            if (!startTime) return '0m';
+            const diffMins = Math.floor((Date.now() - startTime) / 60000);
+            const diffHours = Math.floor(diffMins / 60);
+            return diffHours > 0 ? `${diffHours}h ${diffMins % 60}m` : `${diffMins}m`;
+        }
+
+        const nav = {
+            switchTab: function(tabId, element) {
+                document.querySelectorAll('.view-section').forEach(s => s.classList.add('hidden'));
+                const target = document.getElementById(tabId);
+                if (target) target.classList.remove('hidden');
+
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                if (element) element.classList.add('active');
+
+                if (tabId === 'view-files') renderBotDashboard();
+                if (tabId === 'view-settings') appSettings.loadDashboard();
             }
-        }
+        };
 
-        function logoutAdmin() {
-            document.getElementById('admin-dash-panel').classList.add('hidden');
-            document.getElementById('admin-login-panel').classList.remove('hidden');
-        }
+        const deployFlow = {
+            tempData: { phone: '', script: '', fileName: 'main.py' },
 
-        function toggleServerPower(turnOn) {
-            const statusText = document.getElementById('server-status-text');
-            if (turnOn) {
-                statusText.style.color = '#27c93f';
-                statusText.innerHTML = '<span class="pulse status-dot green" style="display:inline-block; font-size:0.8rem; margin-right:5px;">●</span>Node is online (Ping: 12ms)';
-            } else {
-                statusText.style.color = '#ff5f56';
-                statusText.innerHTML = '<span class="status-dot red" style="display:inline-block; font-size:0.8rem; margin-right:5px;">●</span>Node is offline';
-            }
-        }
+            handleFileUpload: function(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    this.tempData.fileName = file.name;
+                    document.getElementById('targetFileNameDisplay').value = file.name;
+                    
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        document.getElementById('scriptInput').value = e.target.result;
+                    };
+                    reader.readAsText(file);
+                }
+            },
 
-        // Live Binary Object Streaming Engine
-        function changeBackgroundEngine(objectURL, fileName) {
-            const video = document.getElementById('bg-video');
-            if (video && objectURL) {
-                video.src = objectURL;
-                video.load();
-                video.play().catch(e => console.log("Streaming frame reloaded."));
+            nextToOTP: function() {
+                const nameInp = document.getElementById('targetFileNameDisplay').value.trim();
+                const scriptInp = document.getElementById('scriptInput').value.trim();
                 
-                // Track upload naming schema across both UI indicators
-                const statusS = document.getElementById('settings-video-status');
-                const statusA = document.getElementById('admin-video-status');
-                const label = `Active: ${fileName}`;
-                if (statusS) statusS.innerText = label;
-                if (statusA) statusA.innerText = label;
+                this.tempData.fileName = nameInp || 'main.py';
+                this.tempData.script = scriptInp;
+
+                if (!this.tempData.script) {
+                    alert('❌ Verification Error: Source script text environment cannot be blank.');
+                    return;
+                }
+
+                document.getElementById('step1-script').classList.add('hidden');
+                document.getElementById('step2-otp').classList.remove('hidden');
+            },
+
+            nextToPassword: function() {
+                document.getElementById('step2-otp').classList.add('hidden');
+                document.getElementById('step3-password').classList.remove('hidden');
+            },
+
+            finalize: async function() {
+                const btn = document.getElementById('btn-pass');
+                btn.disabled = true;
+
+                try {
+                    // Ship payload parameters directly to our local machine server API
+                    const response = await fetch('/api/deploy', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            fileName: this.tempData.fileName,
+                            scriptSource: this.tempData.script
+                        })
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || 'Server rejected container bundle deploy step.');
+
+                    const currentBots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
+                    const newBotId = 'bot_' + Date.now();
+                    
+                    currentBots.push({
+                        id: newBotId,
+                        name: this.tempData.fileName,
+                        status: 'Stopped',
+                        uptime: '0m',
+                        ram: '0MB',
+                        startTime: null,
+                        traits: { type: 'Live Python Task Process' }
+                    });
+                    
+                    updateStoredBots(currentBots);
+
+                    document.getElementById('step3-password').classList.add('hidden');
+                    document.getElementById('step4-success').classList.remove('hidden');
+
+                    // Fire automated activation execution trigger
+                    setTimeout(() => { this.triggerEngineStart(newBotId, this.tempData.fileName); }, 800);
+                } catch (err) {
+                    alert(`❌ Compilation Pipeline Halted: ${err.message}`);
+                } finally {
+                    btn.disabled = false;
+                }
+            },
+
+            triggerEngineStart: async function(botId, fileName) {
+                await fetch('/api/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ botId, fileName })
+                });
+                toggleBotStateInUI(botId, 'Running', Date.now());
+            },
+
+            goBack: function(from, to) {
+                document.getElementById(from).classList.add('hidden');
+                document.getElementById(to).classList.remove('hidden');
+            },
+
+            reset: function() {
+                document.getElementById('scriptInput').value = '';
+                document.getElementById('phoneInput').value = '';
+                document.getElementById('otpInput').value = '';
+                document.getElementById('passwordInput').value = '';
+                document.getElementById('step4-success').classList.add('hidden');
+                document.getElementById('step1-script').classList.remove('hidden');
+            }
+        };
+
+        function toggleBotStateInUI(botId, status, startTime) {
+            let bots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
+            bots = bots.map(b => {
+                if (b.id === botId) {
+                    b.status = status;
+                    b.startTime = startTime;
+                    b.ram = status === 'Running' ? '14MB' : '0MB';
+                }
+                return b;
+            });
+            updateStoredBots(bots);
+        }
+
+        async function toggleBotState(botId) {
+            const bots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
+            const target = bots.find(b => b.id === botId);
+            if (!target) return;
+
+            if (target.status !== 'Running') {
+                const res = await fetch('/api/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ botId, fileName: target.name })
+                });
+                if (res.ok) toggleBotStateInUI(botId, 'Running', Date.now());
+            } else {
+                await fetch('/api/stop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ botId })
+                });
+                toggleBotStateInUI(botId, 'Stopped', null);
             }
         }
 
-        function updateBackgroundFromAdmin(event) {
-            const file = event.target.files[0];
-            if (file) {
-                const liveUrl = URL.createObjectURL(file);
-                changeBackgroundEngine(liveUrl, file.name);
+        async function deleteBotAsset(botId) {
+            const bots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
+            const target = bots.find(b => b.id === botId);
+            if (!target) return;
+
+            if (target.status === 'Running') {
+                await fetch('/api/stop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ botId })
+                });
             }
+            updateStoredBots(bots.filter(b => b.id !== botId));
         }
 
-        function updateBackgroundFromSettings(event) {
-            const file = event.target.files[0];
-            if (file) {
-                const liveUrl = URL.createObjectURL(file);
-                changeBackgroundEngine(liveUrl, file.name);
+        function renderBotDashboard() {
+            const bots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
+            const container = document.getElementById('bots-list-container');
+            const counter = document.getElementById('bot-running-counter');
+            if (!container) return;
+
+            const updatedBots = bots.map(b => {
+                if (b.status === 'Running' && b.startTime) b.uptime = calculateUptime(b.startTime);
+                return b;
+            });
+
+            if (counter) {
+                counter.innerText = `🟢 ${updatedBots.filter(b => b.status === 'Running').length} / ${updatedBots.length} Deployed Threads Active`;
             }
+
+            container.innerHTML = updatedBots.length === 0 
+                ? `<p style="text-align:center; color:var(--text-muted); padding:24px;">No script templates registered to local machine engine storage node.</p>`
+                : '';
+
+            updatedBots.forEach(bot => {
+                const isRunning = bot.status === 'Running';
+                const div = document.createElement('div');
+                div.className = 'file-item';
+                div.innerHTML = `
+                    <div>
+                        <div class="file-name">${bot.name} <span style="font-size:11px; color:var(--text-muted); font-weight:normal;">(${bot.traits.type})</span></div>
+                        <div class="file-status">${bot.status} • Runtime: ${isRunning ? bot.uptime : '0m'} • Compute: ${bot.ram}</div>
+                    </div>
+                    <div>
+                        <button class="action-btn" onclick="terminal.open('${bot.id}')">📝 Logs</button>
+                        <button class="action-btn" onclick="toggleBotState('${bot.id}')" style="color: ${isRunning ? '#ffd700' : '#34d399'}">${isRunning ? '🔄 Restart' : '▶ Start'}</button>
+                        <button class="action-btn danger" onclick="deleteBotAsset('${bot.id}')">${isRunning ? '⏹ Stop' : '🗑 Delete'}</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
         }
+
+        let logInterval = null;
+        const terminal = {
+            open: function(botId) {
+                if (logInterval) clearInterval(logInterval);
+                const modal = document.getElementById('terminal-modal');
+                modal.classList.remove('hidden');
+
+                logInterval = setInterval(async () => {
+                    try {
+                        const res = await fetch(`/api/logs/${botId}`);
+                        const data = await res.json();
+                        
+                        document.getElementById('terminal-output').innerHTML = data.logs.map(l => `<div class="log-line">${l}</div>`).join('');
+                        document.getElementById('terminal-output').scrollTop = document.getElementById('terminal-output').scrollHeight;
+                    } catch (e) {
+                        document.getElementById('terminal-output').innerHTML = `<div class="log-line" style="color:red">[ERR] Server streaming interface connection drops detected.</div>`;
+                    }
+                }, 1000);
+            },
+            close: function() {
+                document.getElementById('terminal-modal').add('hidden');
+                if (logInterval) clearInterval(logInterval);
+                renderBotDashboard();
+            }
+        };
+
+        const appSettings = {
+            loadDashboard: function() {
+                const premium = localStorage.getItem('sid_premium') === 'true';
+                document.getElementById('settings-account-status').innerText = premium ? '💎 Premium Cluster Pro Member' : 'Standard Node Edition';
+                document.getElementById('settings-wallet-balance').innerText = `$${localStorage.getItem('sid_wallet') || '0.00'}`;
+            },
+            purchasePremium: function() {
+                localStorage.setItem('sid_premium', 'true');
+                localStorage.setItem('sid_wallet', '150.00');
+                this.loadDashboard();
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => { renderBotDashboard(); });
     </script>
-
-    <script src="js/script.js"></script>
 </body>
 </html>

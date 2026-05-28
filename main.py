@@ -26,15 +26,26 @@ import asyncio
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, PasswordHashInvalidError
 
-# --- Flask Keep Alive ---
-from flask import Flask
+# --- Flask Web App Server ---
+from flask import Flask, render_template
 from threading import Thread
 
-app = Flask('')
+# Securely host the Web App files from a specific folder
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+WEBAPP_DIR = os.path.join(BASE_DIR, 'webapp')
+
+# Automatically create the required folders if they don't exist
+os.makedirs(os.path.join(WEBAPP_DIR, 'css'), exist_ok=True)
+os.makedirs(os.path.join(WEBAPP_DIR, 'js'), exist_ok=True)
+
+app = Flask('', template_folder='webapp', static_folder='webapp', static_url_path='/')
 
 @app.route('/')
 def home():
-    return "bot is running...."
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        return "Web App is running! Please place your index.html inside the 'webapp' folder."
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -44,8 +55,8 @@ def keep_alive():
     t = Thread(target=run_flask)
     t.daemon = True
     t.start()
-    print("Flask Keep-Alive server started.")
-# --- End Flask Keep Alive ---
+    print("Flask Web App server started.")
+# --- End Flask Web App Server ---
 
 # --- Configuration ---
 TOKEN = '6248614957:AAGWzd37KASqv6u3OZRxt3gPaqkkdpmRNHg' 
@@ -54,11 +65,10 @@ ADMIN_ID = 2119464081
 YOUR_USERNAME = '@Xricx0' 
 UPDATE_CHANNEL = 'https://t.me/+5uCnxp3U1gMwZjQ1'
 
-# 👇 PUT YOUR WEB APP URL HERE
-WEB_APP_URL = 'worker-production-69b2.up.railway.app'
+# 👇 PUT YOUR PUBLIC HOSTING URL HERE (e.g., Replit or Render link)
+WEB_APP_URL = 'https://your-public-hosting-url.com'
 
 # Folder setup - using absolute paths
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_BOTS_DIR = os.path.join(BASE_DIR, 'upload_bots')
 IROTECH_DIR = os.path.join(BASE_DIR, 'inf')
 DATABASE_PATH = os.path.join(IROTECH_DIR, 'bot_data.db')
@@ -1359,10 +1369,13 @@ def send_log_file(message, log_path, log_filename):
 def _logic_send_welcome(message):
     user_id = message.from_user.id
     chat_id = message.chat.id
+    # Check if the message is in a group or private chat
+    is_group = message.chat.type in ['group', 'supergroup']
+    
     user_name = message.from_user.first_name
     user_username = message.from_user.username
 
-    logger.info(f"Welcome request from user_id: {user_id}, username: @{user_username}")
+    logger.info(f"Welcome request from user_id: {user_id}, username: @{user_username}, group: {is_group}")
 
     if bot_locked and user_id not in admin_ids:
         bot.send_message(chat_id, "⚠️ Bot locked by admin. Try later.")
@@ -1411,28 +1424,32 @@ def _logic_send_welcome(message):
     inline_markup = create_main_menu_inline(user_id)
 
     try:
-        # Send Photo if extracted
-        if photo_file_id: bot.send_photo(chat_id, photo_file_id)
+        # Don't send user profile photo into the group chat to avoid spam
+        if photo_file_id and not is_group: bot.send_photo(chat_id, photo_file_id)
         
-        # If Admin setup a Menu Video, send it with the Inline Menu attached!
+        # Always attach Inline Menu to the video/text
         if menu_video_id:
             try:
                 bot.send_video(chat_id, menu_video_id, caption=welcome_msg_text, reply_markup=inline_markup, parse_mode='Markdown')
-                bot.send_message(chat_id, "Navigating via Reply Keyboard:", reply_markup=main_reply_markup)
+                if not is_group: # ONLY send big reply keyboard in DMs
+                    bot.send_message(chat_id, "Navigating via Reply Keyboard:", reply_markup=main_reply_markup)
             except telebot.apihelper.ApiTelegramException:
                 try: 
                     bot.send_animation(chat_id, menu_video_id, caption=welcome_msg_text, reply_markup=inline_markup, parse_mode='Markdown')
-                    bot.send_message(chat_id, "Navigating via Reply Keyboard:", reply_markup=main_reply_markup)
+                    if not is_group: 
+                        bot.send_message(chat_id, "Navigating via Reply Keyboard:", reply_markup=main_reply_markup)
                 except:
-                    bot.send_message(chat_id, welcome_msg_text, reply_markup=main_reply_markup, parse_mode='Markdown')
-                    bot.send_message(chat_id, "Navigation Menu:", reply_markup=inline_markup)
+                    bot.send_message(chat_id, welcome_msg_text, reply_markup=inline_markup, parse_mode='Markdown')
+                    if not is_group: 
+                        bot.send_message(chat_id, "Navigating via Reply Keyboard:", reply_markup=main_reply_markup)
         else:
-            bot.send_message(chat_id, welcome_msg_text, reply_markup=main_reply_markup, parse_mode='Markdown')
-            bot.send_message(chat_id, "Navigation Menu:", reply_markup=inline_markup)
+            bot.send_message(chat_id, welcome_msg_text, reply_markup=inline_markup, parse_mode='Markdown')
+            if not is_group: 
+                bot.send_message(chat_id, "Navigating via Reply Keyboard:", reply_markup=main_reply_markup)
             
     except Exception as e:
         logger.error(f"Error sending welcome to {user_id}: {e}", exc_info=True)
-        try: bot.send_message(chat_id, welcome_msg_text, reply_markup=main_reply_markup, parse_mode='Markdown')
+        try: bot.send_message(chat_id, welcome_msg_text, reply_markup=inline_markup, parse_mode='Markdown')
         except Exception as fallback_e: logger.error(f"Fallback send_message failed for {user_id}: {fallback_e}")
 
 def _logic_updates_channel(message):

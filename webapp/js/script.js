@@ -1,185 +1,123 @@
-// Utility: Simulate delays
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-// --- Navigation Controller ---
+// ==========================================================================
+//  1. BOTTOM NAVIGATION LOGIC
+// ==========================================================================
 const nav = {
-    switchTab(targetId, element) {
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        element.classList.add('active');
+    switchTab: (targetId, clickedElement) => {
+        // Hide all views
+        document.querySelectorAll('.view-section').forEach(el => {
+            el.classList.add('hidden');
+            el.classList.remove('active');
+        });
+        
+        // Remove active state from all nav icons
+        document.querySelectorAll('.nav-item').forEach(el => {
+            el.classList.remove('active');
+        });
 
-        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-        document.getElementById(targetId).classList.add('active');
+        // Show the targeted view
+        const targetView = document.getElementById(targetId);
+        targetView.classList.remove('hidden');
+        
+        // Small delay to ensure CSS animation triggers properly
+        setTimeout(() => {
+            targetView.classList.add('active');
+        }, 10);
+
+        // Highlight the clicked nav icon
+        clickedElement.classList.add('active');
     }
 };
 
-// --- Deployment Controller ---
+// ==========================================================================
+//  2. DEPLOYMENT WIZARD LOGIC (Visual State Only)
+// ==========================================================================
 const deployFlow = {
-    handleFileUpload(event) {
+    handleFileUpload: (event) => {
         const file = event.target.files[0];
-        if (!file) return;
-
-        document.getElementById('filename-display').innerText = file.name;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            document.getElementById('scriptInput').value = e.target.result;
-        };
-        reader.readAsText(file);
-    },
-
-    async nextToOTP() {
-        const phone = document.getElementById('phoneInput').value;
-        const script = document.getElementById('scriptInput').value;
-        
-        if(!phone || !script) {
-            alert("Please enter a phone number and a script.");
-            return;
+        if (file) {
+            document.getElementById('filename-display').innerText = file.name;
         }
-
-        const btn = document.getElementById('btn-deploy');
-        btn.classList.add('btn-loading');
-        await sleep(1500); 
-        btn.classList.remove('btn-loading');
-
-        document.getElementById('otp-phone-display').innerText = `Code sent to ${phone}`;
-        this.switchStep('step1-script', 'step2-otp');
     },
-
-    async nextToPassword() {
-        const otp = document.getElementById('otpInput').value;
-        if(otp.length < 5) { alert("Please enter a valid OTP."); return; }
-
-        const btn = document.getElementById('btn-otp');
-        btn.classList.add('btn-loading');
-        await sleep(1200); 
-        btn.classList.remove('btn-loading');
-
-        this.switchStep('step2-otp', 'step3-password');
+    
+    // UI progression methods
+    nextToOTP: () => {
+        document.getElementById('step1-script').classList.add('hidden');
+        document.getElementById('step2-otp').classList.remove('hidden');
     },
-
-    async finalize() {
-        const pass = document.getElementById('passwordInput').value;
-        if(!pass) { alert("Password required for 2FA."); return; }
-
-        const btn = document.getElementById('btn-pass');
-        btn.classList.add('btn-loading');
-        await sleep(2000); 
-        btn.classList.remove('btn-loading');
-
-        this.switchStep('step3-password', 'step4-success');
+    
+    nextToPassword: () => {
+        document.getElementById('step2-otp').classList.add('hidden');
+        document.getElementById('step3-password').classList.remove('hidden');
     },
-
-    switchStep(hideId, showId) {
-        document.getElementById(hideId).classList.add('hidden');
-        document.getElementById(showId).classList.remove('hidden');
+    
+    finalize: () => {
+        document.getElementById('step3-password').classList.add('hidden');
+        document.getElementById('step4-success').classList.remove('hidden');
     },
-    goBack(currentId, targetId) { this.switchStep(currentId, targetId); },
-    reset() {
-        document.getElementById('phoneInput').value = "";
-        document.getElementById('scriptInput').value = "";
-        document.getElementById('otpInput').value = "";
-        document.getElementById('passwordInput').value = "";
-        document.getElementById('filename-display').innerText = "main.py";
-        this.switchStep('step4-success', 'step1-script');
+    
+    goBack: (currentStepId, previousStepId) => {
+        document.getElementById(currentStepId).classList.add('hidden');
+        document.getElementById(previousStepId).classList.remove('hidden');
+    },
+    
+    reset: () => {
+        // Clear inputs visually
+        document.getElementById('phoneInput').value = '';
+        document.getElementById('otpInput').value = '';
+        document.getElementById('passwordInput').value = '';
+        
+        // Return to first screen
+        document.getElementById('step4-success').classList.add('hidden');
+        document.getElementById('step1-script').classList.remove('hidden');
     }
 };
 
-// --- Terminal / Live Working Process Controller ---
+// ==========================================================================
+//  3. TERMINAL MODAL LOGIC
+// ==========================================================================
 const terminal = {
-    modal: document.getElementById('terminal-modal'),
-    output: document.getElementById('terminal-output'),
-    title: document.getElementById('terminal-bot-name'),
-    isTyping: false,
-    intervalId: null,
-
-    open(botName, isStopped = false) {
-        this.title.innerText = `~/cloud/bots/${botName}`;
-        this.output.innerHTML = ''; 
-        this.modal.classList.remove('hidden');
-        this.isTyping = true;
-
-        if(isStopped) {
-            this.addLog(`Process ${botName} is currently offline.`, 'log-err');
-            this.addLog("Click 'Start' in the dashboard to initialize.", 'log-warn');
-            return;
-        }
-
-        // Simulate active bot booting up and working
-        this.simulateProcess(botName);
-    },
-
-    close() {
-        this.modal.classList.add('hidden');
-        this.isTyping = false;
-        clearInterval(this.intervalId);
-    },
-
-    addLog(text, className = '') {
-        const line = document.createElement('div');
-        line.className = `log-line ${className}`;
-        const time = new Date().toLocaleTimeString([], { hour12: false });
-        line.innerHTML = `<span style="color: #666;">[${time}]</span> ${text}`;
-        this.output.appendChild(line);
-        this.output.scrollTop = this.output.scrollHeight;
-    },
-
-    async simulateProcess(botName) {
-        this.addLog(`Initializing virtual environment for ${botName}...`, 'log-info');
-        await sleep(800);
-        if(!this.isTyping) return;
+    open: (botName) => {
+        document.getElementById('terminal-bot-name').innerText = botName;
+        document.getElementById('terminal-modal').classList.remove('hidden');
         
-        this.addLog("Authenticating Telegram session via Telethon...");
-        await sleep(1000);
-        if(!this.isTyping) return;
-
-        this.addLog("Session decrypted successfully. Connected to DC-4.", 'log-info');
-        await sleep(600);
-        this.addLog("Bot is now listening for events...");
-
-        // Continuous simulated activity loop
-        this.intervalId = setInterval(() => {
-            const actions = [
-                "Received MessageUpdate (ChatID: -100928374)",
-                "<span class='log-warn'>Handling anti-spam filters... passed.</span>",
-                "Processed trigger '/ping'. Replied in 0.42s",
-                "<span class='log-info'>Auto-reply executed in chat User_1092.</span>",
-                "Scraping new members in target group (Found 3)...",
-                "Ping to API server: 14ms"
-            ];
-            const randomAction = actions[Math.floor(Math.random() * actions.length)];
-            this.addLog(randomAction);
-        }, 2500);
+        // Inject a mock connection log
+        const output = document.getElementById('terminal-output');
+        output.innerHTML = `<div class="log-line log-info">[SYSTEM] Initializing connection to ${botName}...</div>
+                            <div class="log-line" style="animation-delay: 0.5s; opacity: 0;">[OK] Node environment loaded.</div>`;
+    },
+    
+    close: () => {
+        document.getElementById('terminal-modal').classList.add('hidden');
     }
 };
 
-// --- Settings & Admin ---
-const appSettings = {
-    updateVideo() {
-        const url = document.getElementById('video-url-input').value;
-        const videoElement = document.getElementById('bg-video');
-        if(url) {
-            videoElement.src = url;
-            videoElement.play();
-            alert("Background updated! The UI will feel incredibly smooth.");
-        }
-    }
-};
-
+// ==========================================================================
+//  4. ADMIN MOCK LOGIN LOGIC
+// ==========================================================================
 const adminFlow = {
-    async login() {
-        const pass = document.getElementById('adminPassInput').value;
-        const btn = document.getElementById('btn-admin-login');
-        if(pass !== "admin123") { alert("Invalid Admin Credentials"); return; }
-        
-        btn.classList.add('btn-loading');
-        await sleep(1000);
-        btn.classList.remove('btn-loading');
-
+    login: () => {
         document.getElementById('admin-login-panel').classList.add('hidden');
         document.getElementById('admin-dash-panel').classList.remove('hidden');
-        document.getElementById('adminPassInput').value = "";
     },
-    logout() {
+    
+    logout: () => {
+        document.getElementById('adminPassInput').value = '';
         document.getElementById('admin-dash-panel').classList.add('hidden');
         document.getElementById('admin-login-panel').classList.remove('hidden');
+    }
+};
+
+// ==========================================================================
+//  5. SETTINGS LOGIC
+// ==========================================================================
+const appSettings = {
+    updateVideo: () => {
+        const newUrl = document.getElementById('video-url-input').value;
+        const videoElement = document.getElementById('bg-video');
+        
+        if (newUrl) {
+            videoElement.src = newUrl;
+            videoElement.play().catch(e => console.log("Autoplay blocked by browser."));
+        }
     }
 };

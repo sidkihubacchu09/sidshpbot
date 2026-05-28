@@ -11,7 +11,8 @@ import threading
 import asyncio
 from flask import Flask, request, jsonify
 
-app = Flask(__name__)
+# --- ADJUSTMENT 1: Point Flask to the 'webapp' folder ---
+app = Flask(__name__, static_folder="webapp", static_url_path="")
 
 # Core Storage Layout Config
 SESSION_DIR = os.path.abspath("./userbot_sessions")
@@ -27,8 +28,14 @@ PENDING_HANDSHAKES = {}  # Format: { phone: { "client_ref": TelegramClient, "pho
 API_ID = 123456  
 API_HASH = "your_hexadecimal_api_hash_string_here"
 
+# --- ADJUSTMENT 2: Add Root Route to serve the UI ---
+@app.route('/')
+def serve_homepage():
+    """Serves the main frontend UI from the webapp folder."""
+    return app.send_static_file('index.html')
 
-@app.route('/api/deploy/initiate', method=['POST'])
+
+@app.route('/api/deploy/initiate', methods=['POST'])
 def initiate_handshake():
     """
     STAGE 1: Receive Phone + Script, bind session variables, request Telegram OTP Code
@@ -78,7 +85,7 @@ def initiate_handshake():
         return jsonify({"status": "error", "message": f"Cluster connection failed: {str(e)}"}), 500
 
 
-@app.route('/api/deploy/verify-otp', method=['POST'])
+@app.route('/api/deploy/verify-otp', methods=['POST'])
 def verify_otp_challenge():
     """
     STAGE 2: Accept incoming verification code string, check for 2FA Cloud Passwords requirements
@@ -117,7 +124,7 @@ def verify_otp_challenge():
         return jsonify({"status": "error", "message": f"Verification mismatch: {str(e)}"}), 500
 
 
-@app.route('/api/deploy/finalize', method=['POST'])
+@app.route('/api/deploy/finalize', methods=['POST'])
 def finalize_cloud_password():
     """
     STAGE 3: Authorize Two-Step verified cloud credentials and spin background isolated container
@@ -176,7 +183,7 @@ def trigger_background_node_deployment(phone_key, script_file_path):
     ACTIVE_PROCESSES[phone_key] = proc
 
 
-@app.route('/api/bot/control', method=['POST'])
+@app.route('/api/bot/control', methods=['POST'])
 def control_threads():
     """
     Universal API Endpoint to trigger process operations (stop, restart, read live logs)
@@ -212,4 +219,7 @@ if __name__ == '__main__':
     print("==========================================================================")
     print(" SID HOSTING PROCESS HYPERVISOR V4.1 CORE HUB SECURE ONLINE ")
     print("==========================================================================")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    
+    # Defaults to port 5000, can be overridden by environment variables (useful for Render/Heroku)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)

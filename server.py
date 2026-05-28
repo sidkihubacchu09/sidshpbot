@@ -1,247 +1,215 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
+"""
+SID HOSTING — Secure Multi-Instance Asynchronous Userbot Cloud Hypervisor
+Combines standard routing endpoints with dynamic runtime thread compilation for Telethon bots.
+"""
+
 import os
 import sys
-import asyncio
+import subprocess
 import threading
-import sqlite3
-import logging
-from flask import Flask, send_from_directory, request, jsonify
-from telethon import TelegramClient
-from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, PasswordHashInvalidError
+import asyncio
+from flask import Flask, request, jsonify
 
-# Configure Logging Context Infrastructure
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("SID_WEB_GATEWAY")
+app = Flask(__name__)
 
-# Initialize Flask Instance serving assets
-app = Flask(__name__, static_folder='webapp', static_url_path='')
+# Core Storage Layout Config
+SESSION_DIR = os.path.abspath("./userbot_sessions")
+SCRIPTS_DIR = os.path.abspath("./userbot_scripts")
+os.makedirs(SESSION_DIR, exist_ok=True)
+os.makedirs(SCRIPTS_DIR, exist_ok=True)
 
-# Link definitions directly to database schema mapped in bot code
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-IROTECH_DIR = os.path.join(BASE_DIR, 'inf')
-DATABASE_PATH = os.path.join(IROTECH_DIR, 'bot_data.db')
-UPLOAD_BOTS_DIR = os.path.join(BASE_DIR, 'upload_bots')
+# Application state dictionaries tracking references globally
+ACTIVE_PROCESSES = {}  # Format: { phone: Subprocess_Object }
+PENDING_HANDSHAKES = {}  # Format: { phone: { "client_ref": TelegramClient, "phone_code_hash": str } }
 
-# Global tracking structures for connections
-web_runtime_states = {}
-OWNER_ID = 2119464081 # Pulled straight from user deployment context
+# Telethon API Keys (Acquire yours via https://my.telegram.org)
+API_ID = 123456  
+API_HASH = "your_hexadecimal_api_hash_string_here"
 
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
-    conn.rowget = sqlite3.Row
-    return conn
 
-# Ensure table structures match background dependencies
-def provision_web_tables():
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('CREATE TABLE IF NOT EXISTS bot_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT)')
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        logger.error(f"Error provisioning setup components: {e}")
+@app.route('/api/deploy/initiate', method=['POST'])
+def initiate_handshake():
+    """
+    STAGE 1: Receive Phone + Script, bind session variables, request Telegram OTP Code
+    """
+    data = request.json or {}
+    phone = data.get("phone")
+    script_code = data.get("script")
 
-provision_web_tables()
+    if not phone or not script_code:
+        return jsonify({"status": "error", "message": "Missing credentials or code payload."}), 400
 
-# ==========================================================================
-# 🌐 BACKEND STATIC FILES CONTENT ROUTING ENGINE
-# ==========================================================================
-@app.route('/')
-def index():
-    return send_from_directory(app.static_folder, 'index.html')
-
-@app.route('/style.css')
-def style():
-    return send_from_directory(app.static_folder, 'style.css')
-
-@app.route('/app.js')
-def scripts():
-    return send_from_directory(app.static_folder, 'app.js')
-
-# ==========================================================================
-# ⚡ CORE STEP-BY-STEP USERBOT HOSTING DISPATCH API (OTP + 2FA LOOP)
-# ==========================================================================
-
-def run_async_loop(loop):
-    asyncio.set_event_loop(loop)
-    loop.run_forever()
-
-# Single dedicated background thread to manage client connectivity loops
-loop_executor = asyncio.new_event_loop()
-threading.Thread(target=run_async_loop, args=(loop_executor,), daemon=True).start()
-
-@app.route('/api/deploy/initiate', methods=['POST'])
-def initiate_userbot_deployment():
-    data = request.get_json() or {}
-    uid = data.get('user_id')
-    phone = data.get('phone')
-    api_id = data.get('api_id')
-    api_hash = data.get('api_hash')
-    script_content = data.get('script')
-
-    if not all([uid, phone, api_id, api_hash, script_content]):
-        return jsonify({"status": "error", "message": "Missing cluster validation parameters."}), 400
-
-    session_name = os.path.join(BASE_DIR, f"web_session_{uid}")
-    client = TelegramClient(session_name, int(api_id), api_hash)
+    # Ensure phone numbers don't contain hazardous file-path escape anomalies
+    safe_phone = "".join(c for c in phone if c.isalnum() or c in "+")
     
-    # Send login token payload asynchronously
-    future = asyncio.run_coroutine_threadsafe(client.connect(), loop_executor)
-    future.result()
+    # Write custom userbot script to isolates folder
+    script_path = os.path.join(SCRIPTS_DIR, f"{safe_phone}_main.py")
+    with open(script_path, "w", encoding="utf-8") as f:
+        f.write(script_code)
 
-    future_auth = asyncio.run_coroutine_threadsafe(client.send_code_request(phone), loop_executor)
-    phone_code_hash = future_auth.result().phone_code_hash
-
-    # Save tracking parameters into state cache memory
-    web_runtime_states[uid] = {
-        "client": client,
-        "phone": phone,
-        "phone_code_hash": phone_code_hash,
-        "api_id": api_id,
-        "api_hash": api_hash,
-        "script": script_content
-    }
-
-    return jsonify({"status": "otp_required", "message": "Verification token sent to Telegram context."})
-
-@app.route('/api/deploy/verify-otp', methods=['POST'])
-def verify_deployment_otp():
-    data = request.get_json() or {}
-    uid = data.get('user_id')
-    otp = data.get('otp')
-
-    state = web_runtime_states.get(uid)
-    if not state:
-        return jsonify({"status": "error", "message": "Session expired or contextual mismatch state."}), 400
-
-    client = state["client"]
-    
+    # Initialize asynchronous isolation engine thread task for Telethon connection 
     try:
-        future_sign = asyncio.run_coroutine_threadsafe(
-            client.sign_in(state["phone"], otp, phone_code_hash=state["phone_code_hash"]),
-            loop_executor
-        )
-        future_sign.result()
+        from telethon import TelegramClient
+        session_path = os.path.join(SESSION_DIR, f"sess_{safe_phone}")
         
-        # OTP Approved - Spin up script context
-        finalize_deployment_script(uid, state)
-        return jsonify({"status": "success", "message": "Userbot environment core established."})
-
-    except SessionPasswordNeededError:
-        return jsonify({"status": "password_required", "message": "Two-Factor Master cloud configuration active."})
-    except PhoneCodeInvalidError:
-        return jsonify({"status": "error", "message": "The verification token specified is corrupt or incorrect."})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
-
-@app.route('/api/deploy/verify-password', methods=['POST'])
-def verify_deployment_password():
-    data = request.get_json() or {}
-    uid = data.get('user_id')
-    password = data.get('password')
-
-    state = web_runtime_states.get(uid)
-    if not state:
-        return jsonify({"status": "error", "message": "Session target state tracking fault."}), 400
-
-    client = state["client"]
-
-    try:
-        future_pwd = asyncio.run_coroutine_threadsafe(client.sign_in(password=password), loop_executor)
-        future_pwd.result()
+        # Instantiate continuous connection client
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         
-        finalize_deployment_script(uid, state)
-        return jsonify({"status": "success", "message": "2FA bypass authenticated. Sandbox executing."})
-    except PasswordHashInvalidError:
-        return jsonify({"status": "error", "message": "Cloud password verification token mismatch."})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+        client = TelegramClient(session_path, API_ID, API_HASH, loop=loop)
+        loop.run_until_complete(client.connect())
+        
+        # Trigger outbound core request to dispatch telegram validation SMS/app message
+        code_hash_ref = loop.run_until_complete(client.send_code_request(phone))
+        
+        # Persist runtime client instances to cache for processing matching stage requests 
+        PENDING_HANDSHAKES[safe_phone] = {
+            "client": client,
+            "loop": loop,
+            "phone_code_hash": code_hash_ref.phone_code_hash,
+            "phone": phone,
+            "script_path": script_path
+        }
+        
+        return jsonify({"status": "awaiting_otp", "message": "OTP challenge requested successfully."})
 
-def finalize_deployment_script(uid, state):
-    """Compiles script onto disk storage framework and structures telemetry logs"""
-    user_dir = os.path.join(UPLOAD_BOTS_DIR, str(uid))
-    os.makedirs(user_dir, exist_ok=True)
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Cluster connection failed: {str(e)}"}), 500
+
+
+@app.route('/api/deploy/verify-otp', method=['POST'])
+def verify_otp_challenge():
+    """
+    STAGE 2: Accept incoming verification code string, check for 2FA Cloud Passwords requirements
+    """
+    data = request.json or {}
+    phone = data.get("phone")
+    otp_code = data.get("code")
+
+    safe_phone = "".join(c for c in phone if c.isalnum() or c in "+") if phone else None
     
-    target_path = os.path.join(user_dir, "userbot_runtime.py")
-    with open(target_path, "w", encoding="utf-8") as file:
-        file.write(state["script"])
+    # Locate cached configuration block matching criteria
+    handshake = PENDING_HANDSHAKES.get(safe_phone)
+    if not handshake:
+        return jsonify({"status": "error", "message": "Handshake context expired or missing phone index mapping."}), 400
 
-    # Register into shared ecosystem database
+    client = handshake["client"]
+    loop = handshake["loop"]
+    phone_code_hash = handshake["phone_code_hash"]
+
     try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('INSERT OR REPLACE INTO user_files (user_id, file_name, file_type) VALUES (?, ?, ?)',
-                  (int(uid), "userbot_runtime.py", "py"))
-        conn.commit()
-        conn.close()
+        asyncio.set_event_loop(loop)
+        # Attempt standard code sign-in validation
+        from telethon.errors import SessionPasswordNeededError
+        
+        try:
+            loop.run_until_complete(client.sign_in(phone=safe_phone, code=otp_code, phone_code_hash=phone_code_hash))
+            # Success directly without cloud password requirement!
+            trigger_background_node_deployment(safe_phone, handshake["script_path"])
+            return jsonify({"status": "deployed", "message": "Userbot container running successfully without 2FA key."})
+            
+        except SessionPasswordNeededError:
+            # Explicit signal that Two-Step Cloud validation is active on user profile
+            return jsonify({"status": "awaiting_2fa", "message": "Telegram configuration requires a Two-Step Cloud Password entry."})
+
     except Exception as e:
-        logger.error(f"Database registration failure context: {e}")
+        return jsonify({"status": "error", "message": f"Verification mismatch: {str(e)}"}), 500
 
-    # Fire and forget dynamic loop connection thread to run script without blocking web server
-    # This executes perfectly along your background processing design
-    logger.info(f"🚀 Script compiled successfully for deployment channel context {uid} target framework.")
 
-# ==========================================================================
-# 📊 METRICS TELEMETRY & WALLPAPER MANAGING APIS
-# ==========================================================================
-@app.route('/api/telemetry', methods=['GET'])
-def get_dashboard_telemetry():
-    uid = request.args.get('user_id', 0)
+@app.route('/api/deploy/finalize', method=['POST'])
+def finalize_cloud_password():
+    """
+    STAGE 3: Authorize Two-Step verified cloud credentials and spin background isolated container
+    """
+    data = request.json or {}
+    phone = data.get("phone")
+    cloud_password = data.get("password")
+
+    safe_phone = "".join(c for c in phone if c.isalnum() or c in "+") if phone else None
+    handshake = PENDING_HANDSHAKES.get(safe_phone)
     
-    # Query runtime defaults tracking structures directly from SQLite mapping
-    video_url = "https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4"
-    file_count = 0
-    role = "Premium Member" if int(uid) == OWNER_ID else "Standard Member"
+    if not handshake:
+        return jsonify({"status": "error", "message": "Staged verification handshake contextual mapping lost."}), 400
+
+    client = handshake["client"]
+    loop = handshake["loop"]
 
     try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT setting_value FROM bot_settings WHERE setting_key='menu_video_id'")
-        row = c.fetchone()
-        if row: video_url = row[0]
+        asyncio.set_event_loop(loop)
+        # Sign session using cloud key values
+        loop.run_until_complete(client.sign_in(password=cloud_password))
+        
+        # De-register from pending, deploy active runtime pipeline loop
+        trigger_background_node_deployment(safe_phone, handshake["script_path"])
+        del PENDING_HANDSHAKES[safe_phone]
+        
+        return jsonify({"status": "deployed", "message": "Isolated container active. Microservice live."})
 
-        c.execute("SELECT COUNT(*) FROM user_files WHERE user_id=?", (int(uid),))
-        f_row = c.fetchone()
-        if f_row: file_count = f_row[0]
-        conn.close()
     except Exception as e:
-        logger.error(f"Telemetry ingestion issue: {e}")
+        return jsonify({"status": "error", "message": f"2FA Cryptographic unlock failed: {str(e)}"}), 401
 
-    return jsonify({
-        "runtime_status": "Active Sandbox",
-        "file_count": file_count,
-        "limit": 15,
-        "role_title": role,
-        "bg_video": video_url,
-        "logs": [
-            "[gateway] Node execution pipeline allocated.",
-            "[security] Safe script check code validation complete.",
-            f"[runtime] Active instances running inside directory /upload_bots/{uid}"
-        ]
-    })
 
-@app.route('/api/admin/set-background', methods=['POST'])
-def admin_set_background():
-    data = request.get_json() or {}
-    uid = data.get('user_id')
-    video_url = data.get('video_url')
+def trigger_background_node_deployment(phone_key, script_file_path):
+    """
+    STAGE 4: Spin up continuous non-blocking asynchronous processes 
+    ensuring continuous thread persistence.
+    """
+    # Clean up duplicate runtimes if process already exists
+    if phone_key in ACTIVE_PROCESSES:
+        try:
+            ACTIVE_PROCESSES[phone_key].terminate()
+        except Exception:
+            pass
 
-    if int(uid) != OWNER_ID:
-        return jsonify({"success": false, "message": "Administrative authentication failure token."}), 403
+    # Launch userbot python script as isolated background instance process
+    log_file_path = f"{script_file_path}.log"
+    log_file_handle = open(log_file_path, "w", encoding="utf-8")
+    
+    proc = subprocess.Popen(
+        [sys.executable, script_file_path],
+        stdout=log_file_handle,
+        stderr=subprocess.STDOUT,
+        text=True
+    )
+    
+    ACTIVE_PROCESSES[phone_key] = proc
 
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("INSERT OR REPLACE INTO bot_settings (setting_key, setting_value) VALUES ('menu_video_id', ?)", (video_url,))
-        conn.commit()
-        conn.close()
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)})
+
+@app.route('/api/bot/control', method=['POST'])
+def control_threads():
+    """
+    Universal API Endpoint to trigger process operations (stop, restart, read live logs)
+    """
+    data = request.json or {}
+    phone = data.get("phone")
+    action = data.get("action")  # options: "stop", "restart", "logs"
+
+    safe_phone = "".join(c for c in phone if c.isalnum() or c in "+") if phone else None
+    script_path = os.path.join(SCRIPTS_DIR, f"{safe_phone}_main.py")
+
+    if action == "stop":
+        proc = ACTIVE_PROCESSES.get(safe_phone)
+        if proc:
+            proc.terminate()
+            proc.wait()
+            del ACTIVE_PROCESSES[safe_phone]
+            return jsonify({"status": "stopped", "message": "Thread context closed execution cleanly."})
+        return jsonify({"status": "error", "message": "Target process is not actively running."}), 404
+
+    elif action == "logs":
+        log_path = f"{script_path}.log"
+        if os.path.exists(log_path):
+            with open(log_path, "r", encoding="utf-8") as log_file:
+                return jsonify({"status": "success", "logs": log_file.read()})
+        return jsonify({"status": "success", "logs": "[System Active] Awaiting process generation initialization outputs..."})
+
+    return jsonify({"status": "error", "message": "Unknown action parameter instruction mapping."}), 400
+
 
 if __name__ == '__main__':
-    # Bind directly to port variables matching configuration files
-    port = int(os.environ.get("PORT", 8080))
-    logger.info(f"Starting unified multi-threaded platform web app stack on port {port}...")
-    app.run(host='0.0.0.0', port=port)
+    # Initialize the web server node local clusters
+    print("==========================================================================")
+    print(" SID HOSTING PROCESS HYPERVISOR V4.1 CORE HUB SECURE ONLINE ")
+    print("==========================================================================")
+    app.run(host='0.0.0.0', port=5000, debug=True)

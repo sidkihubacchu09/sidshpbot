@@ -3,179 +3,196 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SID HOSTING • PREMIUM CORE PANEL</title>
+    <title>SID Cloud Hosting</title>
     <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-size/6.4.0/css/all.min.css">
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
 
     <div class="video-bg-container">
         <video id="bg-video" autoplay loop muted playsinline>
-            <source id="video-source" src="https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4" type="video/mp4">
+            <source src="https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4" type="video/mp4">
         </video>
         <div class="video-overlay"></div>
     </div>
 
-    <header class="glass-header">
-        <div class="brand">
-            <i class="fa-solid var(--accent-cyber) fa-circle-nodes"></i>
-            <span class="gradient-text">SID HOSTING</span>
-        </div>
-        <div class="server-node">
-            <span class="status-indicator online"></span>
-            <span id="node-text" class="status-label">Node-Alpha Live</span>
-        </div>
-    </header>
-
-    <main class="app-container" id="main-app">
+    <div class="app-container" id="main-app">
 
         <div id="view-deploy" class="view-section active">
-            <div class="glass-panel" id="step1-script">
-                <div class="panel-header">
-                    <h2 class="gradient-text"><i class="fa-solid fa-cloud-arrow-up"></i> Deploy Userbot</h2>
-                </div>
-                <p class="status-text">Inject raw script or stream code file to start hyper-threaded deployment.</p>
+            <div class="glass-panel slide-up" id="step1-script">
+                <div class="panel-header"><h2 class="gradient-text">Deploy Userbot</h2></div>
+                <p class="status-text">Enter your Telegram phone number and upload your script to initialize the Telethon session.</p>
                 
-                <div class="input-wrapper">
-                    <i class="fa-solid fa-phone input-icon"></i>
-                    <input type="tel" id="phoneInput" class="glass-input" placeholder="Phone Number (+1234567890)" autocomplete="off">
-                </div>
-
-                <div class="credentials-row">
-                    <div class="input-wrapper half">
-                        <i class="fa-solid fa-key input-icon"></i>
-                        <input type="number" id="apiIdInput" class="glass-input" placeholder="API ID" autocomplete="off">
-                    </div>
-                    <div class="input-wrapper half">
-                        <i class="fa-solid fa-fingerprint input-icon"></i>
-                        <input type="text" id="apiHashInput" class="glass-input" placeholder="API Hash" autocomplete="off">
-                    </div>
-                </div>
+                <input type="tel" id="phoneInput" class="glass-input" placeholder="Phone Number (e.g. +1234567890)" autocomplete="off">
                 
                 <div class="code-editor-wrapper">
                     <div class="editor-header">
                         <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
-                        <span class="filename" id="filename-display"><i class="fa-brands fa-python"></i> userbot.py</span>
+                        <span class="filename" id="filename-display">main.py</span>
                     </div>
-                    <textarea id="scriptInput" spellcheck="false" placeholder="# Inject your custom Telethon or Pyrogram userbot script pipeline here..."></textarea>
+                    <textarea id="scriptInput" spellcheck="false" placeholder="from telethon import TelegramClient..."></textarea>
                 </div>
 
                 <div class="btn-group">
-                    <input type="file" id="fileUpload" accept=".py,.txt" style="display: none;" onchange="appEngine.handleFileUpload(event)">
+                    <input type="file" id="fileUpload" accept=".py,.js,.zip" style="display: none;" onchange="deployFlow.handleFileUpload(event)">
                     <button class="secondary-btn btn-animate" onclick="document.getElementById('fileUpload').click()">
-                        <i class="fa-solid fa-file-code"></i> Upload Script
+                        📤 Upload Script
                     </button>
-                    <button class="primary-btn btn-animate" id="btn-deploy" onclick="appEngine.initiateConnection()">
-                        <span class="btn-text">Connect Engine</span>
+                    <button class="primary-btn btn-animate" id="btn-deploy" onclick="deployFlow.nextToOTP()">
+                        <span class="btn-text">Connect Node</span>
+                        <div class="spinner"></div>
                     </button>
                 </div>
             </div>
 
-            <div class="glass-panel hidden" id="step2-otp">
-                <div class="panel-header">
-                    <h2><i class="fa-solid fa-shield-halved"></i> Security Verification</h2>
-                </div>
-                <p class="status-text" id="otp-phone-display">Enter the dynamic auth terminal token sent to your Telegram account.</p>
-                <div class="input-wrapper">
-                    <i class="fa-solid fa-lock input-icon"></i>
-                    <input type="text" id="otpInput" class="glass-input text-center font-bold" placeholder="• • • • •" autocomplete="off">
-                </div>
-                <div class="btn-group vertical">
-                    <button class="primary-btn btn-animate" id="btn-otp" onclick="appEngine.verifyOTP()">
-                        <span class="btn-text">Verify Token Link</span>
-                    </button>
-                    <button class="secondary-btn btn-animate" onclick="appEngine.switchPanel('step2-otp', 'step1-script')">Return</button>
-                </div>
-            </div>
-
-            <div class="glass-panel hidden" id="step3-password">
-                <div class="panel-header">
-                    <h2><i class="fa-solid fa-key"></i> 2-Step Password</h2>
-                </div>
-                <p class="status-text">Cloud verification requires your 2FA security string password.</p>
-                <div class="input-wrapper">
-                    <i class="fa-solid fa-user-lock input-icon"></i>
-                    <input type="password" id="passwordInput" class="glass-input" placeholder="Enter 2FA Cloud Password" autocomplete="off">
-                </div>
-                <div class="btn-group vertical">
-                    <button class="primary-btn btn-animate" id="btn-password" onclick="appEngine.verifyPassword()">
-                        <span class="btn-text">Confirm & Run Runtime</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div id="view-dashboard" class="view-section">
-            <div class="glass-panel">
-                <div class="panel-header">
-                    <h2 class="gradient-text"><i class="fa-solid fa-chart-bar"></i> Cloud Terminal Status</h2>
-                </div>
-                <div class="telemetry-grid">
-                    <div class="telemetry-card">
-                        <span class="card-title">Instance State</span>
-                        <span class="card-value text-green" id="dash-status">Running</span>
-                    </div>
-                    <div class="telemetry-card">
-                        <span class="card-title">Allocated Cores</span>
-                        <span class="card-value" id="dash-slots">1 / 15 Available</span>
-                    </div>
-                    <div class="telemetry-card">
-                        <span class="card-title">Active Platform Access</span>
-                        <span class="card-value var(--accent-cyber)" id="dash-role">Premium Member</span>
-                    </div>
-                </div>
-                <div class="log-stream-header">Live Server Log output Stream</div>
-                <div class="terminal-stdout" id="terminal-logs">
-                    [system] Kernel version initialized successfully...<br>
-                    [runtime] Dynamic thread orchestration active.<br>
-                    [gateway] Listening to backend callback loops...
-                </div>
-            </div>
-        </div>
-
-        <div id="view-admin" class="view-section">
-            <div class="glass-panel">
-                <div class="panel-header">
-                    <h2 class="gradient-premium"><i class="fa-solid fa-user-gear"></i> Nexus Administrative Suite</h2>
-                </div>
-                <p class="status-text">Modify infrastructure dynamics, lock cluster parameters, or change system background animations.</p>
-                
-                <div class="input-group-label">Global Dynamic Wall Background Stream URL</div>
-                <div class="input-wrapper">
-                    <i class="fa-solid fa-video input-icon"></i>
-                    <input type="url" id="adminVideoInput" class="glass-input" placeholder="Paste Direct .mp4 Live Stream URL">
-                </div>
-                <button class="primary-btn premium-btn btn-animate mt-10" onclick="appEngine.applyBackgroundVideo()">
-                    <span class="btn-text">Update System Wallpaper</span>
+            <div class="glass-panel hidden slide-up" id="step2-otp">
+                <div class="panel-header"><h2>Verify Connection</h2></div>
+                <p class="status-text" id="otp-phone-display">We sent a Telegram login code to your app.</p>
+                <input type="number" id="otpInput" class="glass-input text-center" placeholder="• • • • •" autocomplete="off">
+                <button class="primary-btn btn-animate" id="btn-otp" onclick="deployFlow.nextToPassword()">
+                    <span class="btn-text">Verify Code</span>
+                    <div class="spinner"></div>
                 </button>
+                <button class="secondary-btn btn-animate mt-10" onclick="deployFlow.goBack('step2-otp', 'step1-script')">Cancel</button>
+            </div>
 
-                <hr class="panel-divider">
+            <div class="glass-panel hidden slide-up" id="step3-password">
+                <div class="panel-header"><h2>2-Step Verification</h2></div>
+                <p class="status-text">Enter your Cloud Password to decrypt the session.</p>
+                <input type="password" id="passwordInput" class="glass-input text-center" placeholder="Cloud Password">
+                <button class="primary-btn btn-animate" id="btn-pass" onclick="deployFlow.finalize()">
+                    <span class="btn-text">Unlock & Deploy</span>
+                    <div class="spinner"></div>
+                </button>
+                <button class="secondary-btn btn-animate mt-10" onclick="deployFlow.goBack('step3-password', 'step2-otp')">Back</button>
+            </div>
+
+            <div class="glass-panel hidden text-center slide-up" id="step4-success">
+                <div class="success-ring"><span class="success-check">✓</span></div>
+                <h2 class="gradient-text">Deployment Active</h2>
+                <p class="status-text mt-10">Your userbot is now securely running on the cloud node.</p>
+                <button class="primary-btn btn-animate mt-20" onclick="nav.switchTab('view-files', document.querySelectorAll('.nav-item')[1])">Go to Bot Dashboard</button>
+                <button class="secondary-btn btn-animate mt-10" onclick="deployFlow.reset()">Deploy Another Script</button>
+            </div>
+        </div>
+
+        <div id="view-files" class="view-section hidden">
+            <div class="glass-panel slide-up">
+                <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>Your Bots</h2>
+                    <span class="status-badge">🟢 1 / 2 Running</span>
+                </div>
+                <p class="status-text">Manage your hosted userbot processes.</p>
                 
-                <div class="admin-controls-grid">
-                    <button class="dashboard-action-btn red-alert" onclick="appEngine.triggerGlobalLock()">
-                        <i class="fa-solid fa-lock"></i> Lock Engine Ecosystem
-                    </button>
-                    <button class="dashboard-action-btn" onclick="appEngine.clearOrphanProcesses()">
-                        <i class="fa-solid fa-broom"></i> Prune Closed Memory Logs
-                    </button>
+                <div class="file-item">
+                    <div class="file-info-header">
+                        <div>
+                            <div class="file-name">userbot_main.py</div>
+                            <div class="file-status">Running • Uptime: 4h 12m • 12MB RAM</div>
+                        </div>
+                        <span class="status-dot green pulse">●</span>
+                    </div>
+                    <div class="file-actions">
+                        <button class="action-btn" onclick="alert('Viewing Logs...')">📝 Logs</button>
+                        <button class="action-btn">🔄 Restart</button>
+                        <button class="action-btn danger">⏹ Stop</button>
+                    </div>
                 </div>
             </div>
         </div>
-    </main>
 
-    <nav class="glass-dock">
-        <div class="dock-item active" onclick="appEngine.navigateView(this, 'view-deploy')">
-            <i class="fa-solid fa-circle-nodes dock-icon"></i>
-            <span class="dock-label">Deploy</span>
+        <div id="view-settings" class="view-section hidden">
+            <div class="glass-panel slide-up mb-15">
+                <div class="panel-header"><h2>Bot Utilities</h2></div>
+                <div class="utility-grid mt-10">
+                    <button class="action-btn" onclick="alert('Checking Ping...')">⚡ Check Speed</button>
+                    <button class="action-btn" onclick="alert('Fetching Stats...')">📊 Statistics</button>
+                    <button class="action-btn" onclick="window.open('https://t.me/yourchannel', '_blank')">📢 Updates</button>
+                    <button class="action-btn" onclick="window.open('https://t.me/yourusername', '_blank')">📞 Contact Owner</button>
+                </div>
+            </div>
+
+            <div class="glass-panel slide-up">
+                <div class="panel-header"><h2>Account Dashboard</h2></div>
+                <div class="dashboard-stats">
+                    <div class="flex-between mb-10">
+                        <span class="text-muted">Account Status:</span>
+                        <span class="text-bold">Standard (Free)</span>
+                    </div>
+                    <div class="flex-between mb-15">
+                        <span class="text-muted">Script Limits:</span>
+                        <span class="text-green text-bold">1 / 10 Used</span>
+                    </div>
+                    <button class="premium-btn btn-animate">💎 Upgrade to Premium</button>
+                </div>
+            </div>
         </div>
-        <div class="dock-item" onclick="appEngine.navigateView(this, 'view-dashboard')">
-            <i class="fa-solid fa-chart-line dock-icon"></i>
-            <span class="dock-label">Dashboard</span>
+
+        <div id="view-admin" class="view-section hidden">
+            <div class="glass-panel text-center slide-up" id="admin-login-panel">
+                <div class="panel-header" style="justify-content: center;"><h2 class="gradient-text">Admin Portal</h2></div>
+                <p class="status-text">Restricted Area. Authentication required.</p>
+                <input type="password" id="adminPassInput" class="glass-input text-center" placeholder="Admin Password">
+                <button class="primary-btn btn-animate" id="btn-admin-login" onclick="adminFlow.verify()">
+                    <span class="btn-text">Access Core</span>
+                    <div class="spinner"></div>
+                </button>
+            </div>
+
+            <div class="glass-panel hidden slide-up" id="admin-dash-panel">
+                <div class="panel-header">
+                    <h2 class="gradient-text">Server Core</h2>
+                </div>
+                <p class="status-text" id="server-status-text" style="color: #27c93f;"><span class="pulse status-dot green" style="display:inline-block; font-size:0.8rem; margin-right:5px;">●</span>Node is online (Ping: 12ms)</p>
+                
+                <div class="admin-stats-grid mt-15">
+                    <div class="stat-card">
+                        <div class="stat-value">14</div><div class="stat-label">Active Bots</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">89%</div><div class="stat-label">CPU Load</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">1,204</div><div class="stat-label">Total Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value text-green">$345</div><div class="stat-label">Revenue</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-stats mt-15">
+                    <p class="text-bold mb-10">Server Power Switch</p>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="action-btn text-green" style="flex: 1; border-color: rgba(39,201,63,0.4);" onclick="adminFlow.togglePower(true)">▶ Power ON</button>
+                        <button class="action-btn danger" style="flex: 1;" onclick="adminFlow.togglePower(false)">⏹ Power OFF</button>
+                    </div>
+                </div>
+
+                <div class="dashboard-stats mt-15 mb-15">
+                    <p class="text-bold mb-10">Change Global Interface Background</p>
+                    <input type="text" id="admin-video-url" class="glass-input mb-10" placeholder="https://.../video.mp4" value="https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4">
+                    <button class="secondary-btn btn-animate" style="width: 100%;" onclick="adminFlow.updateVideo()">
+                        🎬 Update UI Background
+                    </button>
+                </div>
+
+                <button class="secondary-btn danger btn-animate" style="width: 100%;" onclick="adminFlow.logout()">Secure Logout</button>
+            </div>
         </div>
-        <div class="dock-item" id="admin-nav-tab" onclick="appEngine.navigateView(this, 'view-admin')">
-            <i class="fa-solid fa-crown dock-icon"></i>
-            <span class="dock-label">Admin</span>
+
+    </div>
+
+    <nav class="glass-nav">
+        <div class="nav-item active" onclick="nav.switchTab('view-deploy', this)">
+            <span class="nav-icon">☁️</span><span class="nav-label">Deploy</span>
+        </div>
+        <div class="nav-item" onclick="nav.switchTab('view-files', this)">
+            <span class="nav-icon">🤖</span><span class="nav-label">My Bots</span>
+        </div>
+        <div class="nav-item" onclick="nav.switchTab('view-settings', this)">
+            <span class="nav-icon">⚙️</span><span class="nav-label">Utilities</span>
+        </div>
+        <div class="nav-item" onclick="nav.switchTab('view-admin', this)">
+            <span class="nav-icon">🛡️</span><span class="nav-label">Admin</span>
         </div>
     </nav>
 

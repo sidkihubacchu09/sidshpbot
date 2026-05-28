@@ -1,281 +1,358 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SID HOSTING — Next-Gen Userbot Node</title>
-    <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
+/**
+ * SID HOSTING — Master Javascript Interface Orchestration Engine
+ */
 
-    <div class="video-bg-container">
-        <video id="bg-video" autoplay loop muted playsinline>
-            <source src="https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4" type="video/mp4">
-        </video>
-        <div class="video-overlay"></div>
-    </div>
+// Global state monitoring
+const AppState = {
+    phone: '',
+    scriptContent: '',
+    currentSessionToken: null,
+    activeBots: {
+        'auto_reply': { name: 'auto_reply.py', status: 'Running', uptime: '4h 12m', ram: '14.2MB' },
+        'scraper_bot': { name: 'scraper_bot.py', status: 'Stopped', uptime: '0m', ram: '0.0MB' }
+    }
+};
 
-    <div id="toast-container" class="toast-container"></div>
+// Toast Notifications System
+const toast = {
+    show(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const element = document.createElement('div');
+        element.className = `toast ${type}`;
+        element.innerText = message;
+        container.appendChild(element);
+        setTimeout(() => { element.remove(); }, 4000);
+    }
+};
 
-    <div class="app-container" id="main-app">
+// Navigation Core Module
+const nav = {
+    switchTab(targetViewId, element) {
+        document.querySelectorAll('.view-section').forEach(view => view.classList.add('hidden'));
+        const activeView = document.getElementById(targetViewId);
+        if (activeView) activeView.classList.remove('hidden');
 
-        <div id="view-deploy" class="view-section active">
-            
-            <div class="glass-panel" id="step1-script">
-                <div class="panel-header">
-                    <h2 class="gradient-text">Cloud Deployment Engine</h2>
-                    <span class="badge premium-badge">Node v4.1</span>
-                </div>
-                <p class="status-text">Enter your phone number connected to Telegram and write or upload your specialized userbot script.</p>
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        if (element) element.classList.add('active');
+    }
+};
+
+// User Deployment Pipeline Controller (Phone -> OTP -> 2FA Password -> Active Session Container)
+const deployFlow = {
+    handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('scriptInput').value = e.target.result;
+            document.getElementById('filename-display').innerText = file.name;
+            toast.show(`Imported: ${file.name} loaded successfully into compiler cache.`);
+        };
+        reader.readAsText(file);
+    },
+
+    async nextToOTP() {
+        const phone = document.getElementById('phoneInput').value.trim();
+        const script = document.getElementById('scriptInput').value.trim();
+        const btn = document.getElementById('btn-deploy');
+
+        if (!phone || !script) {
+            toast.show('Error: Credentials and userbot script payload cannot be blank.', 'error');
+            return;
+        }
+
+        AppState.phone = phone;
+        AppState.scriptContent = script;
+
+        // Toggle micro-processing state
+        btn.classList.add('loading');
+
+        try {
+            // REST Handshake mapping to Python backend API
+            const response = await fetch('/api/deploy/initiate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: phone, script: script })
+            }).catch(() => null); // Fallback if server is not fully initialized
+
+            // Simulated state container injection logic for frontend demonstration
+            setTimeout(() => {
+                btn.classList.remove('loading');
+                document.getElementById('otp-phone-display').innerText = `A 5-digit verification code has been dispatched to ${phone} via Telegram.`;
+                document.getElementById('step1-script').classList.add('hidden');
+                document.getElementById('step2-otp').classList.remove('hidden');
+                toast.show('Authentication request created. Awaiting manual confirmation code.');
+            }, 1200);
+
+        } catch (err) {
+            btn.classList.remove('loading');
+            toast.show('Handshake pipeline failure.', 'error');
+        }
+    },
+
+    async nextToPassword() {
+        const otpCode = document.getElementById('otpInput').value.trim();
+        const btn = document.getElementById('btn-otp');
+
+        if (otpCode.length < 4) {
+            toast.show('Invalid validation code length.', 'error');
+            return;
+        }
+
+        btn.classList.add('loading');
+
+        try {
+            const response = await fetch('/api/deploy/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: otpCode })
+            }).catch(() => null);
+
+            setTimeout(() => {
+                btn.classList.remove('loading');
+                // Backend signal emulation determining if 2FA cloud password challenge is active
+                document.getElementById('step2-otp').classList.add('hidden');
+                document.getElementById('step3-password').classList.remove('hidden');
+                toast.show('Session challenge verified. Cloud password verification required.');
+            }, 1200);
+
+        } catch (err) {
+            btn.classList.remove('loading');
+        }
+    },
+
+    async finalize() {
+        const password = document.getElementById('passwordInput').value;
+        const btn = document.getElementById('btn-pass');
+
+        if (!password) {
+            toast.show('Cloud decrypt protection key is required.', 'error');
+            return;
+        }
+
+        btn.classList.add('loading');
+
+        try {
+            const response = await fetch('/api/deploy/finalize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: password })
+            }).catch(() => null);
+
+            setTimeout(() => {
+                btn.classList.remove('loading');
+                document.getElementById('step3-password').classList.add('hidden');
+                document.getElementById('step4-success').classList.remove('hidden');
                 
-                <div class="input-group">
-                    <label class="field-label">Telegram Phone Number</label>
-                    <input type="tel" id="phoneInput" class="glass-input" placeholder="e.g., +1234567890" autocomplete="off">
-                </div>
+                // Add the newly deployed bot script dynamically to our visible tracking node lists
+                const fileName = document.getElementById('filename-display').innerText;
+                const normalizedId = fileName.replace('.', '_');
                 
-                <div class="code-editor-wrapper">
-                    <div class="editor-header">
-                        <div class="window-dots">
-                            <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
-                        </div>
-                        <span class="filename" id="filename-display">userbot_main.py</span>
-                    </div>
-                    <textarea id="scriptInput" spellcheck="false" placeholder="from telethon import TelegramClient, events&#10;&#10;# Your custom Telethon handler logic goes here..."></textarea>
-                </div>
-
-                <div class="btn-group">
-                    <input type="file" id="fileUpload" accept=".py,.txt" style="display: none;" onchange="deployFlow.handleFileUpload(event)">
-                    <button class="secondary-btn btn-animate" onclick="document.getElementById('fileUpload').click()">
-                        <span>📤 Upload Script</span>
-                    </button>
-                    <button class="primary-btn btn-animate" id="btn-deploy" onclick="deployFlow.nextToOTP()">
-                        <span class="btn-text">Connect Cloud Node</span>
-                        <div class="spinner"></div>
-                    </button>
-                </div>
-            </div>
-
-            <div class="glass-panel hidden" id="step2-otp">
-                <div class="panel-header">
-                    <h2 class="gradient-text">Verify Node Handshake</h2>
-                </div>
-                <p class="status-text target-phone" id="otp-phone-display">A 5-digit verification code has been dispatched to your active Telegram application.</p>
+                AppState.activeBots[normalizedId] = { name: fileName, status: 'Running', uptime: '0m', ram: '12.0MB' };
+                this.syncBotListUI();
                 
-                <div class="input-group text-center">
-                    <label class="field-label">Telegram Login Code</label>
-                    <input type="number" id="otpInput" class="glass-input text-center letters-spaced" placeholder="• • • • •" autocomplete="off">
-                </div>
-                
-                <button class="primary-btn btn-animate" id="btn-otp" onclick="deployFlow.nextToPassword()">
-                    <span class="btn-text">Verify Handshake Code</span>
-                    <div class="spinner"></div>
-                </button>
-                <button class="secondary-btn btn-animate mt-12" onclick="deployFlow.goBack('step2-otp', 'step1-script')">Abort & Go Back</button>
-            </div>
+                toast.show('Userbot activated successfully!', 'success');
+            }, 1500);
 
-            <div class="glass-panel hidden" id="step3-password">
-                <div class="panel-header">
-                    <h2 class="gradient-text">Two-Step Verification</h2>
-                </div>
-                <p class="status-text">Your Telegram account requires a Cloud Password (2FA) to safely sign and encrypt the session.</p>
-                
-                <div class="input-group">
-                    <label class="field-label">Telegram Cloud Password</label>
-                    <input type="password" id="passwordInput" class="glass-input text-center" placeholder="••••••••••••">
-                </div>
-                
-                <button class="primary-btn btn-animate" id="btn-pass" onclick="deployFlow.finalize()">
-                    <span class="btn-text">Unlock Session & Deploy</span>
-                    <div class="spinner"></div>
-                </button>
-                <button class="secondary-btn btn-animate mt-12" onclick="deployFlow.goBack('step3-password', 'step2-otp')">Back to OTP</button>
-            </div>
+        } catch (err) {
+            btn.classList.remove('loading');
+        }
+    },
 
-            <div class="glass-panel hidden text-center" id="step4-success">
-                <div class="success-ring"><span class="success-check">✓</span></div>
-                <h2 class="gradient-glow-text">Deployment Successful</h2>
-                <p class="status-text mt-12">Your standalone userbot script is fully securely compiled, signed, and running inside an isolated cloud container sandbox.</p>
-                
-                <button class="primary-btn btn-animate mt-20" onclick="nav.switchTab('view-files', document.querySelector('.nav-item:nth-child(2)'))">
-                    Open Process Dashboard
-                </button>
-                <button class="secondary-btn btn-animate mt-12" onclick="deployFlow.reset()">
-                    Deploy Secondary Instance
-                </button>
-            </div>
-        </div>
+    goBack(currentStepId, previousStepId) {
+        document.getElementById(currentStepId).classList.add('hidden');
+        document.getElementById(previousStepId).classList.remove('hidden');
+    },
 
-        <div id="view-files" class="view-section hidden">
-            <div class="glass-panel">
-                <div class="panel-header">
-                    <h2>Managed Grid Matrix</h2>
-                    <span class="badge active-badge" id="bot-count-badge">🟢 1 / 2 Threads Online</span>
-                </div>
-                <p class="status-text">Realtime management system for your active background userbot workflows.</p>
-                
-                <div id="bots-list-container">
-                    <div class="file-item stagger-1" id="bot-auto_reply">
-                        <div class="file-info-header">
-                            <div>
-                                <div class="file-name">auto_reply.py</div>
-                                <div class="file-status">Container Active • Uptime: <span class="timer">04h 12m</span> • Allocated: 14.2MB RAM</div>
-                            </div>
-                            <span class="status-dot green pulse">●</span>
-                        </div>
-                        <div class="file-actions">
-                            <button class="action-btn text-transparent-glow" onclick="terminal.open('auto_reply.py')">📝 Terminal Logs</button>
-                            <button class="action-btn text-transparent-glow" onclick="botControl.restart('auto_reply')">🔄 Restart Thread</button>
-                            <button class="action-btn danger text-transparent-glow" onclick="botControl.stop('auto_reply')">⏹ Terminate</button>
-                        </div>
+    reset() {
+        document.getElementById('step4-success').classList.add('hidden');
+        document.getElementById('step1-script').classList.remove('hidden');
+        document.getElementById('phoneInput').value = '';
+        document.getElementById('otpInput').value = '';
+        document.getElementById('passwordInput').value = '';
+        document.getElementById('filename-display').innerText = 'userbot_main.py';
+        document.getElementById('scriptInput').value = '';
+    },
+
+    syncBotListUI() {
+        const container = document.getElementById('bots-list-container');
+        if (!container) return;
+        
+        let html = '';
+        let onlineCount = 0;
+        let totalCount = 0;
+
+        for (const [id, bot] of Object.entries(AppState.activeBots)) {
+            totalCount++;
+            const isRunning = bot.status === 'Running';
+            if (isRunning) onlineCount++;
+
+            html += `
+            <div class="file-item ${isRunning ? '' : 'process-stopped'}" id="bot-${id}">
+                <div class="file-info-header">
+                    <div>
+                        <div class="file-name ${isRunning ? '' : 'text-muted-name'}">${bot.name}</div>
+                        <div class="file-status">${isRunning ? 'Container Active' : 'Process Interrupted'} • Uptime: <span class="timer">${bot.uptime}</span> • Allocated: ${bot.ram}</div>
                     </div>
-
-                    <div class="file-item stagger-2 process-stopped" id="bot-scraper_bot">
-                        <div class="file-info-header">
-                            <div>
-                                <div class="file-name text-muted-name">scraper_bot.py</div>
-                                <div class="file-status">Process Interrupted • 0.0MB RAM</div>
-                            </div>
-                            <span class="status-dot red">●</span>
-                        </div>
-                        <div class="file-actions">
-                            <button class="action-btn text-transparent-glow" onclick="terminal.open('scraper_bot.py', true)">📝 Historical Logs</button>
-                            <button class="action-btn success-btn text-transparent-glow" onclick="botControl.start('scraper_bot')">▶ Initialize Node</button>
-                            <button class="action-btn danger text-transparent-glow" onclick="botControl.delete('scraper_bot')">🗑 Wipe Storage</button>
-                        </div>
-                    </div>
+                    <span class="status-dot ${isRunning ? 'green pulse' : 'red'}">●</span>
                 </div>
-            </div>
-        </div>
-
-        <div id="terminal-modal" class="modal-overlay hidden">
-            <div class="terminal-container">
-                <div class="terminal-header">
-                    <div class="terminal-title">
-                        <span class="dot red" onclick="terminal.close()"></span>
-                        <span class="dot yellow"></span>
-                        <span class="dot green"></span>
-                        <span id="terminal-bot-name">stdout_stream@cloud_node</span>
-                    </div>
-                    <span class="close-btn" onclick="terminal.close()">✖</span>
+                <div class="file-actions">
+                    <button class="action-btn text-transparent-glow" onclick="terminal.open('${bot.name}')">📝 Terminal Logs</button>
+                    ${isRunning ? 
+                        `<button class="action-btn text-transparent-glow" onclick="botControl.restart('${id}')">🔄 Restart Thread</button>
+                         <button class="action-btn danger text-transparent-glow" onclick="botControl.stop('${id}')">⏹ Terminate</button>` :
+                        `<button class="action-btn success-btn text-transparent-glow" onclick="botControl.start('${id}')">▶ Initialize Node</button>
+                         <button class="action-btn danger text-transparent-glow" onclick="botControl.delete('${id}')">🗑 Wipe Storage</button>`
+                    }
                 </div>
-                <div class="terminal-body" id="terminal-output"></div>
-            </div>
-        </div>
+            </div>`;
+        }
+        container.innerHTML = html;
+        document.getElementById('bot-count-badge').innerText = `🟢 ${onlineCount} / ${totalCount} Threads Online`;
+    }
+};
 
-        <div id="view-settings" class="view-section hidden">
-            <div class="glass-panel stagger-1">
-                <div class="panel-header"><h2>Account Configuration</h2></div>
-                <div class="account-card-gradient">
-                    <div class="account-row">
-                        <span class="acc-label">Tier Status:</span>
-                        <span class="acc-val premium-tier-text">Standard (Free Tier)</span>
-                    </div>
-                    <div class="account-row">
-                        <span class="acc-label">Node Credits:</span>
-                        <span class="acc-val balance-text">$0.00 USD</span>
-                    </div>
-                    <button class="primary-btn premium-btn btn-animate mt-12">
-                        💎 Purchase Enterprise Premium Node
-                    </button>
-                </div>
-            </div>
+// Individual Process Controls Wrapper Engine
+const botControl = {
+    stop(botId) {
+        if(AppState.activeBots[botId]) {
+            AppState.activeBots[botId].status = 'Stopped';
+            AppState.activeBots[botId].ram = '0.0MB';
+            deployFlow.syncBotListUI();
+            toast.show(`Process thread reference key [${botId}] terminated natively.`, 'error');
+        }
+    },
+    start(botId) {
+        if(AppState.activeBots[botId]) {
+            AppState.activeBots[botId].status = 'Running';
+            AppState.activeBots[botId].ram = '14.5MB';
+            AppState.activeBots[botId].uptime = '1m';
+            deployFlow.syncBotListUI();
+            toast.show(`Container cluster initialized for node context [${botId}].`, 'success');
+        }
+    },
+    restart(botId) {
+        toast.show(`Flushing instruction cache. Restarting container for: ${botId}...`);
+        this.stop(botId);
+        setTimeout(() => this.start(botId), 1000);
+    },
+    delete(botId) {
+        if(confirm(`Are you sure you want to completely wipe data contexts for ${botId}?`)) {
+            delete AppState.activeBots[botId];
+            deployFlow.syncBotListUI();
+            toast.show(`Process reference mapping wiped completely from storage nodes.`);
+        }
+    }
+};
 
-            <div class="glass-panel stagger-2 mt-20">
-                <div class="panel-header"><h2>UI Aesthetics</h2></div>
-                <div class="input-group">
-                    <label class="field-label">Background Video Asset URL</label>
-                    <input type="text" id="video-url-input" class="glass-input" placeholder="https://domain.com/video.mp4" value="https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4">
-                    <button class="secondary-btn btn-animate" onclick="uiEngine.updateBackgroundFromSettings()">Update Fluid Stream Asset</button>
-                </div>
-            </div>
-        </div>
+// Continuous Live Diagnostic Streams Terminal
+let terminalInterval = null;
+const terminal = {
+    open(botName) {
+        document.getElementById('terminal-modal').classList.remove('hidden');
+        document.getElementById('terminal-bot-name').innerText = `stdout_stream@${botName}:~#`;
+        
+        const output = document.getElementById('terminal-output');
+        output.innerHTML = `<p style="color: #64748b;">[system] Hooking stdout stream matrix channel for process: ${botName}...</p>`;
+        
+        const diagnosticLogsMock = [
+            "Connecting to Telegram data center server grids...",
+            "Authorization handshakes established securely via cloud wrapper.",
+            "Telethon engine listening for matching message event matrix contexts...",
+            "Database engine successfully mapped memory segments.",
+            "[INFO] Response dispatched to user session ID: 49210",
+            "[PING] Thread response latency confirmed at 14ms.",
+            "Garbage collection cycle purged 1.2MB residual cache leaks."
+        ];
 
-        <div id="view-admin" class="view-section hidden">
-            <div class="glass-panel text-center" id="admin-login-panel">
-                <div class="panel-header justify-center">
-                    <h2 class="gradient-text">Admin Gatekeeper</h2>
-                </div>
-                <p class="status-text">Root access validation mandatory. Session attempts are log-monitored.</p>
-                <input type="password" id="adminPassInput" class="glass-input text-center" placeholder="Enter System Token Key">
-                <button class="primary-btn btn-animate" id="btn-admin-login" onclick="adminDashboard.verifyPassword()">
-                    <span class="btn-text">Authenticate Core Token</span>
-                    <div class="spinner"></div>
-                </button>
-            </div>
+        let index = 0;
+        terminalInterval = setInterval(() => {
+            const time = new Date().toLocaleTimeString();
+            if (index < diagnosticLogsMock.length) {
+                output.innerHTML += `<p>[${time}] <span style="color: #cbd5e1;">${diagnosticLogsMock[index]}</span></p>`;
+                index++;
+            } else {
+                output.innerHTML += `<p>[${time}] <span style="color: var(--accent-cyber);">[idle] Listening for upcoming cloud matrix pipelines...</span></p>`;
+            }
+            output.scrollTop = output.scrollHeight;
+        }, 1500);
+    },
+    close() {
+        document.getElementById('terminal-modal').classList.add('hidden');
+        if (terminalInterval) clearInterval(terminalInterval);
+    }
+};
 
-            <div class="glass-panel hidden" id="admin-dash-panel">
-                <div class="panel-header">
-                    <h2 class="gradient-text">Master Server Matrix</h2>
-                    <span class="badge active-badge" id="global-server-badge">● Engine Online</span>
-                </div>
-                <p class="status-text" id="server-status-text"><span class="pulse status-dot green">●</span>Primary Node Cluster operational (Cluster Latency: 12ms)</p>
-                
-                <div class="admin-stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-value" id="stat-active-bots">14</div>
-                        <div class="stat-label">Active Processes</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="stat-cpu-load">89%</div>
-                        <div class="stat-label">CPU Core Stress</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="stat-total-users">1,204</div>
-                        <div class="stat-label">Registered Accounts</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value neon-green" id="stat-payments">$345.00</div>
-                        <div class="stat-label">Gross Intake (24h)</div>
-                    </div>
-                </div>
+// Global Admin Performance Dashboard Modules
+const adminDashboard = {
+    verifyPassword() {
+        const passwordField = document.getElementById('adminPassInput');
+        const tokenValue = passwordField.value;
+        const loginBtn = document.getElementById('btn-admin-login');
 
-                <div class="admin-section-block">
-                    <p class="block-title">Master Process Hypervisor Power State</p>
-                    <div class="power-btn-flex">
-                        <button class="action-btn success-btn text-transparent-glow" onclick="adminDashboard.toggleServerPower(true)">▶ Power ON Nodes</button>
-                        <button class="action-btn danger text-transparent-glow" onclick="adminDashboard.toggleServerPower(false)">⏹ Kill Hypervisor Threads</button>
-                    </div>
-                </div>
+        loginBtn.classList.add('loading');
 
-                <div class="admin-section-block mt-16">
-                    <p class="block-title">Override Global Live Broadcast Background</p>
-                    <input type="text" id="admin-video-url-input" class="glass-input" placeholder="https://cdn.example.com/asset.mp4" value="https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4">
-                    <button class="secondary-btn btn-animate" onclick="adminDashboard.updateGlobalBackground()">
-                        🎬 Broadcast Global Fluid Video Asset
-                    </button>
-                </div>
+        setTimeout(() => {
+            loginBtn.classList.remove('loading');
+            if (tokenValue === 'sid999') {
+                document.getElementById('admin-login-panel').classList.add('hidden');
+                document.getElementById('admin-dash-panel').classList.remove('hidden');
+                passwordField.value = '';
+                toast.show('Root access validation confirmed. Greetings Admin Sid.', 'success');
+            } else {
+                toast.show('Access Denied. Cryptographic master key check failed.', 'error');
+            }
+        }, 1000);
+    },
 
-                <div class="admin-section-block mt-16">
-                    <p class="block-title">Premium Nodes Registry (Live Database View)</p>
-                    <div class="premium-users-list">
-                        <div class="user-row"><span>@alpha_dev (Premium Node #1)</span><span class="status-text-green">Active</span></div>
-                        <div class="user-row"><span>@cryptoking (Premium Node #2)</span><span class="status-text-green">Active</span></div>
-                        <div class="user-row"><span>@sid999_vip (Premium Master)</span><span class="status-text-gold">Lifetime Premium</span></div>
-                        <div class="user-row text-muted-name"><span>@tester_account (Free Sandbox)</span><span class="text-muted-name">Unpaid Standard</span></div>
-                    </div>
-                </div>
+    logout() {
+        document.getElementById('admin-dash-panel').classList.add('hidden');
+        document.getElementById('admin-login-panel').classList.remove('hidden');
+        toast.show('Tokens securely flushed from session caches.');
+    },
 
-                <button class="secondary-btn admin-logout-btn btn-animate mt-20" onclick="adminDashboard.logout()">Wipe Access Tokens & Logout</button>
-            </div>
-        </div>
+    toggleServerPower(isPowerOn) {
+        const indicator = document.getElementById('server-status-text');
+        const globalBadge = document.getElementById('global-server-badge');
+        
+        if (isPowerOn) {
+            indicator.style.color = 'var(--sys-green)';
+            indicator.innerHTML = '<span class="pulse status-dot green">●</span>Primary Node Cluster operational (Cluster Latency: 12ms)';
+            globalBadge.className = "badge active-badge";
+            globalBadge.innerText = "● Engine Online";
+            toast.show('Hypervisor instances awakened across master clusters.', 'success');
+        } else {
+            indicator.style.color = 'var(--sys-red)';
+            indicator.innerHTML = '<span class="status-dot red">●</span>Hypervisor thread pools terminated. System Offline.';
+            globalBadge.className = "badge premium-badge";
+            globalBadge.innerText = "⏹ Engine Dead";
+            toast.show('System Warning: All connected userbot container engines killed.', 'error');
+        }
+    },
 
-    </div>
+    updateGlobalBackground() {
+        const targetUrl = document.getElementById('admin-video-url-input').value.trim();
+        uiEngine.applyVideoSource(targetUrl);
+        document.getElementById('video-url-input').value = targetUrl;
+        toast.show('Global aesthetic layout broadcast changes updated successfully.');
+    }
+};
 
-    <nav class="glass-nav">
-        <div class="nav-item active" onclick="nav.switchTab('view-deploy', this)">
-            <span class="nav-icon">☁️</span><span class="nav-label">Deploy Node</span>
-        </div>
-        <div class="nav-item" onclick="nav.switchTab('view-files', this)">
-            <span class="nav-icon">🤖</span><span class="nav-label">My Bots</span>
-        </div>
-        <div class="nav-item" onclick="nav.switchTab('view-settings', this)">
-            <span class="nav-icon">⚙️</span><span class="nav-label">Settings</span>
-        </div>
-        <div class="nav-item" onclick="nav.switchTab('view-admin', this)">
-            <span class="nav-icon">🛡️</span><span class="nav-label">Admin Core</span>
-        </div>
-    </nav>
-
-    <script src="js/script.js"></script>
-</body>
-</html>
+// UI Core View Layer Rendering Engine
+const uiEngine = {
+    applyVideoSource(url) {
+        const videoElement = document.getElementById('bg-video');
+        if (videoElement && url) {
+            videoElement.src = url;
+            videoElement.load();
+            videoElement.play().catch(() => console.warn("Backdrop video sync adjusted."));
+        }
+    },
+    updateBackgroundFromSettings() {
+        const targetUrl = document.getElementById('video-url-input').value.trim();
+        this.applyVideoSource(targetUrl);
+        document.getElementById('admin-video-url-input').value = targetUrl;
+        toast.show('Personal background video asset updated.', 'success');
+    }
+};

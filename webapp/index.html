@@ -78,39 +78,10 @@
             <div class="glass-panel">
                 <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
                     <h2>Your Bots</h2>
-                    <span style="font-size: 0.8rem; background: rgba(39, 201, 63, 0.2); color: #27c93f; padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(39, 201, 63, 0.4); font-weight: bold;">🟢 1 / 2 Running</span>
+                    <span id="bot-running-counter" style="font-size: 0.8rem; background: rgba(39, 201, 63, 0.2); color: #27c93f; padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(39, 201, 63, 0.4); font-weight: bold;">🟢 1 / 2 Running</span>
                 </div>
                 <p class="status-text">Manage your hosted userbot processes.</p>
-                
-                <div class="file-item stagger-1">
-                    <div class="file-info-header">
-                        <div>
-                            <div class="file-name">auto_reply.py</div>
-                            <div class="file-status">Running • Uptime: 4h 12m • 12MB RAM</div>
-                        </div>
-                        <span class="status-dot green pulse">●</span>
-                    </div>
-                    <div class="file-actions">
-                        <button class="action-btn" onclick="terminal.open('auto_reply.py')">📝 Logs</button>
-                        <button class="action-btn">🔄 Restart</button>
-                        <button class="action-btn danger">⏹ Stop</button>
-                    </div>
-                </div>
-
-                <div class="file-item stagger-2">
-                    <div class="file-info-header">
-                        <div>
-                            <div style="color: #fff; font-weight: bold;">scraper_bot.py</div>
-                            <div class="file-status">Stopped • 0MB RAM</div>
-                        </div>
-                        <span class="status-dot red">●</span>
-                    </div>
-                    <div class="file-actions">
-                        <button class="action-btn" onclick="terminal.open('scraper_bot.py', true)">📝 Logs</button>
-                        <button class="action-btn" style="color: #27c93f; border-color: rgba(39,201,63,0.3);">▶ Start</button>
-                        <button class="action-btn danger">🗑 Delete</button>
-                    </div>
-                </div>
+                <div id="bots-list-container"></div>
             </div>
         </div>
 
@@ -130,29 +101,32 @@
         </div>
 
         <div id="view-settings" class="view-section hidden">
-            <div class="glass-panel stagger-1" style="margin-bottom: 20px;">
+            <div class="glass-panel" style="margin-bottom: 20px;">
                 <div class="panel-header"><h2>Account Dashboard</h2></div>
                 <div style="background: rgba(0, 0, 0, 0.4); padding: 15px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); margin-top: 15px; text-align: left;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                         <span style="color: #ccc;">Account Status:</span>
-                        <span style="color: #fff; font-weight: bold;">Standard (Free)</span>
+                        <span id="settings-account-status" style="color: #fff; font-weight: bold;">Standard (Free)</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
                         <span style="color: #ccc;">Wallet Balance:</span>
-                        <span style="color: #27c93f; font-weight: bold;">$0.00</span>
+                        <span id="settings-wallet-balance" style="color: #27c93f; font-weight: bold;">$0.00</span>
                     </div>
-                    <button class="primary-btn btn-animate" style="width: 100%; background: linear-gradient(90deg, #ffd700, #ff8c00); color: #000; font-weight: bold; border: none; box-shadow: 0 4px 15px rgba(255, 140, 0, 0.3);">
+                    <button id="settings-upgrade-btn" class="primary-btn btn-animate" style="width: 100%; background: linear-gradient(90deg, #ffd700, #ff8c00); color: #000; font-weight: bold; border: none; box-shadow: 0 4px 15px rgba(255, 140, 0, 0.3);">
                         💎 Upgrade to Premium
                     </button>
                 </div>
             </div>
 
-            <div class="glass-panel stagger-2">
+            <div class="glass-panel">
                 <div class="panel-header"><h2>Preferences</h2></div>
                 <div class="mt-20">
-                    <p style="margin-bottom: 10px; font-size: 0.9rem; color: #ccc;">Background Video URL</p>
-                    <input type="text" id="video-url-input" class="glass-input" placeholder="https://.../video.mp4" value="https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4">
-                    <button class="secondary-btn btn-animate" onclick="updateBackgroundFromSettings()">Update Background</button>
+                    <p style="margin-bottom: 12px; font-size: 0.9rem; color: #ccc;">Background UI Skin Engine</p>
+                    <input type="file" id="video-url-input" accept="video/*" style="display: none;" onchange="updateBackgroundFromSettings(event)">
+                    <button class="secondary-btn btn-animate" style="width: 100%;" onclick="document.getElementById('video-url-input').click()">
+                        🎬 Upload New Background Video
+                    </button>
+                    <div id="settings-video-status" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 8px; text-align: center;">Using system default video loop</div>
                 </div>
             </div>
         </div>
@@ -203,10 +177,11 @@
 
                 <div style="background: rgba(0, 0, 0, 0.4); padding: 15px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); margin-top: 15px; margin-bottom: 15px; text-align: left;">
                     <p style="color: #fff; margin-bottom: 10px; font-weight: bold; font-size: 0.9rem;">Change Web Background Video</p>
-                    <input type="text" id="admin-video-url-input" class="glass-input" style="margin-bottom: 10px;" placeholder="https://.../video.mp4" value="https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4">
-                    <button class="secondary-btn btn-animate" style="width: 100%; border-color: rgba(255,255,255,0.2);" onclick="updateBackgroundFromAdmin()">
-                        🎬 Update Background Video
+                    <input type="file" id="admin-video-url-input" accept="video/*" style="display: none;" onchange="updateBackgroundFromAdmin(event)">
+                    <button class="secondary-btn btn-animate" style="width: 100%; border-color: rgba(255,255,255,0.2);" onclick="document.getElementById('admin-video-url-input').click()">
+                        🎬 Upload Background Video
                     </button>
+                    <div id="admin-video-status" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 8px; text-align: center;">Using system default video loop</div>
                 </div>
 
                 <button class="secondary-btn admin-logout-btn btn-animate" onclick="logoutAdmin()">Secure Logout</button>
@@ -231,7 +206,6 @@
     </nav>
 
     <script>
-        // Password Protection for sid999
         function verifyAdminPassword() {
             const pass = document.getElementById('adminPassInput').value;
             if (pass === 'sid999') {
@@ -248,7 +222,6 @@
             document.getElementById('admin-login-panel').classList.remove('hidden');
         }
 
-        // Server Power toggles
         function toggleServerPower(turnOn) {
             const statusText = document.getElementById('server-status-text');
             if (turnOn) {
@@ -260,30 +233,37 @@
             }
         }
 
-        // Instant background video synchronized updating
-        function changeBackgroundEngine(url) {
+        // Live Binary Object Streaming Engine
+        function changeBackgroundEngine(objectURL, fileName) {
             const video = document.getElementById('bg-video');
-            if (video && url) {
-                video.src = url;
+            if (video && objectURL) {
+                video.src = objectURL;
                 video.load();
-                video.play().catch(e => console.log("Video source modified successfully."));
+                video.play().catch(e => console.log("Streaming frame reloaded."));
+                
+                // Track upload naming schema across both UI indicators
+                const statusS = document.getElementById('settings-video-status');
+                const statusA = document.getElementById('admin-video-status');
+                const label = `Active: ${fileName}`;
+                if (statusS) statusS.innerText = label;
+                if (statusA) statusA.innerText = label;
             }
         }
 
-        function updateBackgroundFromAdmin() {
-            const url = document.getElementById('admin-video-url-input').value;
-            changeBackgroundEngine(url);
-            
-            const settingsInput = document.getElementById('video-url-input');
-            if (settingsInput) settingsInput.value = url;
+        function updateBackgroundFromAdmin(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const liveUrl = URL.createObjectURL(file);
+                changeBackgroundEngine(liveUrl, file.name);
+            }
         }
 
-        function updateBackgroundFromSettings() {
-            const url = document.getElementById('video-url-input').value;
-            changeBackgroundEngine(url);
-            
-            const adminInput = document.getElementById('admin-video-url-input');
-            if (adminInput) adminInput.value = url;
+        function updateBackgroundFromSettings(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const liveUrl = URL.createObjectURL(file);
+                changeBackgroundEngine(liveUrl, file.name);
+            }
         }
     </script>
 

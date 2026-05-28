@@ -7,7 +7,7 @@ from flask import Flask, request, jsonify
 
 # --- ADJUSTMENT: Configure Flask to serve static files from the 'webapp' folder ---
 # This allows your index.html to access /css/style.css and /js/script.js automatically.
-app = Flask(__name__, static_folder="webapp", static_url_path="")
+app = Flask(__name__, static_folder="webapp", static_url_path="https://worker-production-69b2.up.railway.app/")
 
 # Core Storage Layout Config
 SESSION_DIR = os.path.abspath("./userbot_sessions")

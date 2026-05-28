@@ -3,174 +3,182 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SidHosting Premium Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>SID HOSTING • PREMIUM CORE PANEL</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-size/6.4.0/css/all.min.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
 
-    <div class="background-decor bg-circle-1"></div>
-    <div class="background-decor bg-circle-2"></div>
-
-    <div class="dashboard-container">
-        
-        <aside class="sidebar">
-            <div class="brand">
-                <i class="fa-solid fa-robot logo-icon"></i>
-                <h2>SidHosting <span>v2.0</span></h2>
-            </div>
-            <nav class="nav-menu">
-                <a href="#" class="nav-item active"><i class="fa-solid fa-chart-pie"></i> Overview</a>
-                <a href="#" class="nav-item"><i class="fa-solid fa-folder-open"></i> Running Files</a>
-                <a href="#" class="nav-item admin-only"><i class="fa-solid fa-user-shield"></i> Admin Panel</a>
-                <a href="#" class="nav-item"><i class="fa-solid fa-gears"></i> Settings</a>
-            </nav>
-            <div class="sidebar-footer">
-                <p>Logged in as <strong id="user-role">Owner</strong></p>
-            </div>
-        </aside>
-
-        <main class="main-content">
-            
-            <header class="top-bar">
-                <div class="welcome-text">
-                    <h1>Premium Dashboard</h1>
-                    <p>Monitor your hosted scripts and server runtime instances</p>
-                </div>
-                <div class="user-profile">
-                    <span class="premium-badge"><i class="fa-solid fa-crown"></i> Premium Account</span>
-                    <div class="avatar">S9</div>
-                </div>
-            </header>
-
-            <section class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-icon"><i class="fa-solid fa-microchip"></i></div>
-                    <div class="metric-info">
-                        <h3>Active Scripts</h3>
-                        <p class="metric-value" id="active-count">3 Running</p>
-                    </div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-icon"><i class="fa-solid fa-shield-halved"></i></div>
-                    <div class="metric-info">
-                        <h3>Bot Lock Status</h3>
-                        <p class="metric-value status-secure">Unlocked</p>
-                    </div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-icon"><i class="fa-solid fa-server"></i></div>
-                    <div class="metric-info">
-                        <h3>Allowed Slots</h3>
-                        <p class="metric-value">999 Max</p>
-                    </div>
-                </div>
-            </section>
-
-            <section class="content-section">
-                <div class="section-header">
-                    <h2><i class="fa-solid fa-circle-dot live-pulse"></i> Your Running Premium Files</h2>
-                    <button class="btn btn-primary"><i class="fa-solid fa-cloud-arrow-up"></i> Upload File</button>
-                </div>
-                
-                <div class="files-table-wrapper">
-                    <table class="premium-table">
-                        <thead>
-                            <tr>
-                                <th>File Name</th>
-                                <th>Runtime Engine</th>
-                                <th>Execution Process ID</th>
-                                <th>Uptime Status</th>
-                                <th>Actions Control</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td class="file-title"><i class="fa-brands fa-python py-color"></i> main_userbot.py</td>
-                                <td><span class="tag tag-py">Python 3</span></td>
-                                <td><code>PID: 14204</code></td>
-                                <td><span class="status status-running"><i class="fa-solid fa-spinner fa-spin"></i> Running</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-action btn-log" title="View Realtime Logs"><i class="fa-solid fa-terminal"></i></button>
-                                        <button class="btn-action btn-stop" title="Kill Process"><i class="fa-solid fa-square-stop"></i></button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="file-title"><i class="fa-brands fa-square-js js-color"></i> auto_responder.js</td>
-                                <td><span class="tag tag-js">Node.js</span></td>
-                                <td><code>PID: 9028</code></td>
-                                <td><span class="status status-running"><i class="fa-solid fa-spinner fa-spin"></i> Running</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn-action btn-log" title="View Realtime Logs"><i class="fa-solid fa-terminal"></i></button>
-                                        <button class="btn-action btn-stop" title="Kill Process"><i class="fa-solid fa-square-stop"></i></button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <div class="two-column-grid">
-                
-                <section class="content-section">
-                    <div class="section-header">
-                        <h2><i class="fa-solid fa-user-lock"></i> Admin Configuration Portal</h2>
-                    </div>
-                    <form class="premium-form" onsubmit="event.preventDefault();">
-                        <div class="form-group">
-                            <label for="admin-pass">Set New Admin Password</label>
-                            <div class="input-with-icon">
-                                <i class="fa-solid fa-key"></i>
-                                <input type="password" id="admin-pass" placeholder="Enter password (e.g., sid999)">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="admin-id-field">Assigned Administrative Client ID</label>
-                            <div class="input-with-icon">
-                                <i class="fa-solid fa-fingerprint"></i>
-                                <input type="text" id="admin-id-field" value="2119464081" readonly>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-accent"><i class="fa-solid fa-floppy-disk"></i> Apply Admin Access Credentials</button>
-                    </form>
-                </section>
-
-                <section class="content-section">
-                    <div class="section-header">
-                        <h2><i class="fa-solid fa-sliders"></i> Fast Action Controls</h2>
-                    </div>
-                    <div class="toggle-control-list">
-                        <div class="toggle-item">
-                            <div class="toggle-info">
-                                <h4>Global Bot Lockout State</h4>
-                                <p>Restricts file submission workflows exclusively to admins</p>
-                            </div>
-                            <label class="switch-container">
-                                <input type="checkbox">
-                                <span class="slider-button"></span>
-                            </label>
-                        </div>
-                        <div class="toggle-item">
-                            <div class="toggle-info">
-                                <h4>Force Multi-Threading Logs</h4>
-                                <p>Enables asynchronous runtime tracking for all PIDs</p>
-                            </div>
-                            <label class="switch-container">
-                                <input type="checkbox" checked>
-                                <span class="slider-button"></span>
-                            </label>
-                        </div>
-                    </div>
-                </section>
-            </div>
-
-        </main>
+    <div class="video-bg-container">
+        <video id="bg-video" autoplay loop muted playsinline>
+            <source id="video-source" src="https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4" type="video/mp4">
+        </video>
+        <div class="video-overlay"></div>
     </div>
 
+    <header class="glass-header">
+        <div class="brand">
+            <i class="fa-solid var(--accent-cyber) fa-circle-nodes"></i>
+            <span class="gradient-text">SID HOSTING</span>
+        </div>
+        <div class="server-node">
+            <span class="status-indicator online"></span>
+            <span id="node-text" class="status-label">Node-Alpha Live</span>
+        </div>
+    </header>
+
+    <main class="app-container" id="main-app">
+
+        <div id="view-deploy" class="view-section active">
+            <div class="glass-panel" id="step1-script">
+                <div class="panel-header">
+                    <h2 class="gradient-text"><i class="fa-solid fa-cloud-arrow-up"></i> Deploy Userbot</h2>
+                </div>
+                <p class="status-text">Inject raw script or stream code file to start hyper-threaded deployment.</p>
+                
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-phone input-icon"></i>
+                    <input type="tel" id="phoneInput" class="glass-input" placeholder="Phone Number (+1234567890)" autocomplete="off">
+                </div>
+
+                <div class="credentials-row">
+                    <div class="input-wrapper half">
+                        <i class="fa-solid fa-key input-icon"></i>
+                        <input type="number" id="apiIdInput" class="glass-input" placeholder="API ID" autocomplete="off">
+                    </div>
+                    <div class="input-wrapper half">
+                        <i class="fa-solid fa-fingerprint input-icon"></i>
+                        <input type="text" id="apiHashInput" class="glass-input" placeholder="API Hash" autocomplete="off">
+                    </div>
+                </div>
+                
+                <div class="code-editor-wrapper">
+                    <div class="editor-header">
+                        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+                        <span class="filename" id="filename-display"><i class="fa-brands fa-python"></i> userbot.py</span>
+                    </div>
+                    <textarea id="scriptInput" spellcheck="false" placeholder="# Inject your custom Telethon or Pyrogram userbot script pipeline here..."></textarea>
+                </div>
+
+                <div class="btn-group">
+                    <input type="file" id="fileUpload" accept=".py,.txt" style="display: none;" onchange="appEngine.handleFileUpload(event)">
+                    <button class="secondary-btn btn-animate" onclick="document.getElementById('fileUpload').click()">
+                        <i class="fa-solid fa-file-code"></i> Upload Script
+                    </button>
+                    <button class="primary-btn btn-animate" id="btn-deploy" onclick="appEngine.initiateConnection()">
+                        <span class="btn-text">Connect Engine</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="glass-panel hidden" id="step2-otp">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-shield-halved"></i> Security Verification</h2>
+                </div>
+                <p class="status-text" id="otp-phone-display">Enter the dynamic auth terminal token sent to your Telegram account.</p>
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-lock input-icon"></i>
+                    <input type="text" id="otpInput" class="glass-input text-center font-bold" placeholder="• • • • •" autocomplete="off">
+                </div>
+                <div class="btn-group vertical">
+                    <button class="primary-btn btn-animate" id="btn-otp" onclick="appEngine.verifyOTP()">
+                        <span class="btn-text">Verify Token Link</span>
+                    </button>
+                    <button class="secondary-btn btn-animate" onclick="appEngine.switchPanel('step2-otp', 'step1-script')">Return</button>
+                </div>
+            </div>
+
+            <div class="glass-panel hidden" id="step3-password">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-key"></i> 2-Step Password</h2>
+                </div>
+                <p class="status-text">Cloud verification requires your 2FA security string password.</p>
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-user-lock input-icon"></i>
+                    <input type="password" id="passwordInput" class="glass-input" placeholder="Enter 2FA Cloud Password" autocomplete="off">
+                </div>
+                <div class="btn-group vertical">
+                    <button class="primary-btn btn-animate" id="btn-password" onclick="appEngine.verifyPassword()">
+                        <span class="btn-text">Confirm & Run Runtime</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-dashboard" class="view-section">
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <h2 class="gradient-text"><i class="fa-solid fa-chart-bar"></i> Cloud Terminal Status</h2>
+                </div>
+                <div class="telemetry-grid">
+                    <div class="telemetry-card">
+                        <span class="card-title">Instance State</span>
+                        <span class="card-value text-green" id="dash-status">Running</span>
+                    </div>
+                    <div class="telemetry-card">
+                        <span class="card-title">Allocated Cores</span>
+                        <span class="card-value" id="dash-slots">1 / 15 Available</span>
+                    </div>
+                    <div class="telemetry-card">
+                        <span class="card-title">Active Platform Access</span>
+                        <span class="card-value var(--accent-cyber)" id="dash-role">Premium Member</span>
+                    </div>
+                </div>
+                <div class="log-stream-header">Live Server Log output Stream</div>
+                <div class="terminal-stdout" id="terminal-logs">
+                    [system] Kernel version initialized successfully...<br>
+                    [runtime] Dynamic thread orchestration active.<br>
+                    [gateway] Listening to backend callback loops...
+                </div>
+            </div>
+        </div>
+
+        <div id="view-admin" class="view-section">
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <h2 class="gradient-premium"><i class="fa-solid fa-user-gear"></i> Nexus Administrative Suite</h2>
+                </div>
+                <p class="status-text">Modify infrastructure dynamics, lock cluster parameters, or change system background animations.</p>
+                
+                <div class="input-group-label">Global Dynamic Wall Background Stream URL</div>
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-video input-icon"></i>
+                    <input type="url" id="adminVideoInput" class="glass-input" placeholder="Paste Direct .mp4 Live Stream URL">
+                </div>
+                <button class="primary-btn premium-btn btn-animate mt-10" onclick="appEngine.applyBackgroundVideo()">
+                    <span class="btn-text">Update System Wallpaper</span>
+                </button>
+
+                <hr class="panel-divider">
+                
+                <div class="admin-controls-grid">
+                    <button class="dashboard-action-btn red-alert" onclick="appEngine.triggerGlobalLock()">
+                        <i class="fa-solid fa-lock"></i> Lock Engine Ecosystem
+                    </button>
+                    <button class="dashboard-action-btn" onclick="appEngine.clearOrphanProcesses()">
+                        <i class="fa-solid fa-broom"></i> Prune Closed Memory Logs
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <nav class="glass-dock">
+        <div class="dock-item active" onclick="appEngine.navigateView(this, 'view-deploy')">
+            <i class="fa-solid fa-circle-nodes dock-icon"></i>
+            <span class="dock-label">Deploy</span>
+        </div>
+        <div class="dock-item" onclick="appEngine.navigateView(this, 'view-dashboard')">
+            <i class="fa-solid fa-chart-line dock-icon"></i>
+            <span class="dock-label">Dashboard</span>
+        </div>
+        <div class="dock-item" id="admin-nav-tab" onclick="appEngine.navigateView(this, 'view-admin')">
+            <i class="fa-solid fa-crown dock-icon"></i>
+            <span class="dock-label">Admin</span>
+        </div>
+    </nav>
+
+    <script src="app.js"></script>
 </body>
 </html>

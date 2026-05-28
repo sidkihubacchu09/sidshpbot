@@ -5,9 +5,8 @@ import subprocess
 import asyncio
 from flask import Flask, request, jsonify
 
-# --- ADJUSTMENT: Configure Flask to serve static files from the 'webapp' folder ---
-# This allows your index.html to access /css/style.css and /js/script.js automatically.
-app = Flask(__name__, static_folder="webapp", static_url_path="https://worker-production-69b2.up.railway.app/")
+# --- FIX: static_url_path is set to "" so it serves from the root URL ---
+app = Flask(__name__, static_folder="webapp", static_url_path="")
 
 # Core Storage Layout Config
 SESSION_DIR = os.path.abspath("./userbot_sessions")
@@ -19,7 +18,7 @@ os.makedirs(SCRIPTS_DIR, exist_ok=True)
 ACTIVE_PROCESSES = {}
 PENDING_HANDSHAKES = {}
 
-# Telegram API Keys
+# --- CRITICAL: Replace these with your actual Telegram API credentials ---
 API_ID = 123456  
 API_HASH = "your_hexadecimal_api_hash_string_here"
 
@@ -129,4 +128,4 @@ def control_threads():
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)

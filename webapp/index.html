@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ProBot Cloud Hosting</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -21,40 +21,47 @@
         <div id="view-deploy" class="view-section active">
             
             <div class="glass-panel" id="step1-script">
-                <div class="panel-header"><h2>Deploy UserBot</h2></div>
-                <p class="status-text">Enter your phone number and paste your script.</p>
+                <div class="panel-header"><h2 class="gradient-text">Deploy Bot</h2></div>
+                <p class="status-text">Enter credentials and write/upload your Python script.</p>
                 
-                <input type="text" id="phoneInput" class="glass-input" placeholder="Phone Number (e.g. +1234567890)" autocomplete="off">
+                <input type="tel" id="phoneInput" class="glass-input" placeholder="Phone Number (e.g. +1234567890)" autocomplete="off">
                 
                 <div class="code-editor-wrapper">
                     <div class="editor-header">
                         <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
-                        <span class="filename">main.py</span>
+                        <span class="filename" id="filename-display">main.py</span>
                     </div>
-                    <textarea id="scriptInput" spellcheck="false" placeholder="# Write your Telethon/Pyrogram script here..."></textarea>
+                    <textarea id="scriptInput" spellcheck="false" placeholder="from telethon import TelegramClient..."></textarea>
                 </div>
 
-                <button class="primary-btn" id="btn-deploy" onclick="deployFlow.nextToOTP()">
-                    <span class="btn-text">Connect to Node</span>
-                    <div class="spinner"></div>
-                </button>
+                <div class="btn-group">
+                    <input type="file" id="fileUpload" accept=".py,.txt" style="display: none;" onchange="deployFlow.handleFileUpload(event)">
+                    <button class="secondary-btn btn-animate" onclick="document.getElementById('fileUpload').click()">
+                        📤 Upload Script
+                    </button>
+                    <button class="primary-btn btn-animate" id="btn-deploy" onclick="deployFlow.nextToOTP()">
+                        <span class="btn-text">Connect Node</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
             </div>
 
             <div class="glass-panel hidden" id="step2-otp">
                 <div class="panel-header"><h2>Verify Connection</h2></div>
-                <p class="status-text" id="otp-phone-display">We sent a code to your Telegram app.</p>
-                <input type="number" id="otpInput" class="glass-input text-center" placeholder="• • • • •">
-                <button class="primary-btn" id="btn-otp" onclick="deployFlow.nextToPassword()">
+                <p class="status-text" id="otp-phone-display">We sent a login code to your Telegram app.</p>
+                <input type="number" id="otpInput" class="glass-input text-center" placeholder="• • • • •" autocomplete="off">
+                <button class="primary-btn btn-animate" id="btn-otp" onclick="deployFlow.nextToPassword()">
                     <span class="btn-text">Verify Code</span>
                     <div class="spinner"></div>
                 </button>
+                <button class="secondary-btn btn-animate mt-10" onclick="deployFlow.goBack('step2-otp', 'step1-script')">Cancel</button>
             </div>
 
             <div class="glass-panel hidden" id="step3-password">
                 <div class="panel-header"><h2>2-Step Verification</h2></div>
                 <p class="status-text">Enter your Cloud Password to decrypt the session.</p>
-                <input type="password" id="passwordInput" class="glass-input text-center" placeholder="Password">
-                <button class="primary-btn" id="btn-pass" onclick="deployFlow.finalize()">
+                <input type="password" id="passwordInput" class="glass-input text-center" placeholder="Cloud Password">
+                <button class="primary-btn btn-animate" id="btn-pass" onclick="deployFlow.finalize()">
                     <span class="btn-text">Unlock & Deploy</span>
                     <div class="spinner"></div>
                 </button>
@@ -63,77 +70,125 @@
             <div class="glass-panel hidden text-center" id="step4-success">
                 <div class="success-ring"><span class="success-check">✓</span></div>
                 <h2 class="gradient-text">Deployment Active</h2>
-                <p class="status-text">Your script is now running continuously on the cloud.</p>
+                <p class="status-text mt-10">Your script is now securely running continuously on the cloud node.</p>
+                <button class="primary-btn btn-animate mt-20" onclick="nav.switchTab('view-files', document.querySelector('.nav-item:nth-child(2)'))">Go to Bot Dashboard</button>
+                <button class="secondary-btn btn-animate mt-10" onclick="deployFlow.reset()">Deploy Another Script</button>
             </div>
         </div>
 
-        <div id="view-admin-login" class="view-section hidden">
-            <div class="glass-panel text-center">
-                <div class="panel-header" style="justify-content: center;"><h2>Admin Portal</h2></div>
+        <div id="view-files" class="view-section hidden">
+            <div class="glass-panel">
+                <div class="panel-header"><h2>Your Bots</h2></div>
+                <p class="status-text">Manage your hosted userbot processes.</p>
+                
+                <div class="file-item stagger-1">
+                    <div class="file-info-header">
+                        <div>
+                            <div class="file-name">auto_reply.py</div>
+                            <div class="file-status">Running • Uptime: 4h 12m • 12MB RAM</div>
+                        </div>
+                        <span class="status-dot green pulse">●</span>
+                    </div>
+                    <div class="file-actions">
+                        <button class="action-btn" onclick="terminal.open('auto_reply.py')">📝 Logs</button>
+                        <button class="action-btn">🔄 Restart</button>
+                        <button class="action-btn danger">⏹ Stop</button>
+                    </div>
+                </div>
+
+                <div class="file-item stagger-2">
+                    <div class="file-info-header">
+                        <div>
+                            <div style="color: #fff; font-weight: bold;">scraper_bot.py</div>
+                            <div class="file-status">Stopped • 0MB RAM</div>
+                        </div>
+                        <span class="status-dot red">●</span>
+                    </div>
+                    <div class="file-actions">
+                        <button class="action-btn" onclick="terminal.open('scraper_bot.py', true)">📝 Logs</button>
+                        <button class="action-btn" style="color: #27c93f; border-color: rgba(39,201,63,0.3);">▶ Start</button>
+                        <button class="action-btn danger">🗑 Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="terminal-modal" class="modal-overlay hidden">
+            <div class="terminal-container">
+                <div class="terminal-header">
+                    <div class="terminal-title">
+                        <span class="dot red" onclick="terminal.close()"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                        <span id="terminal-bot-name">terminal_process</span>
+                    </div>
+                    <span class="close-btn" onclick="terminal.close()">✖</span>
+                </div>
+                <div class="terminal-body" id="terminal-output">
+                    </div>
+            </div>
+        </div>
+
+        <div id="view-settings" class="view-section hidden">
+            <div class="glass-panel stagger-1">
+                <div class="panel-header"><h2>Preferences</h2></div>
+                <div class="mt-20">
+                    <p style="margin-bottom: 10px; font-size: 0.9rem; color: #ccc;">Background Video URL</p>
+                    <input type="text" id="video-url-input" class="glass-input" placeholder="https://.../video.mp4" value="https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4">
+                    <button class="secondary-btn btn-animate" onclick="appSettings.updateVideo()">Update Background</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-admin" class="view-section hidden">
+            <div class="glass-panel text-center" id="admin-login-panel">
+                <div class="panel-header" style="justify-content: center;"><h2 class="gradient-text">Admin Portal</h2></div>
                 <p class="status-text">Restricted Area. Authentication required.</p>
                 <input type="password" id="adminPassInput" class="glass-input text-center" placeholder="Admin Password">
-                <button class="primary-btn" id="btn-admin-login" onclick="adminFlow.login()">
+                <button class="primary-btn btn-animate" id="btn-admin-login" onclick="adminFlow.login()">
                     <span class="btn-text">Access Core</span>
                     <div class="spinner"></div>
                 </button>
             </div>
-        </div>
 
-        <div id="view-admin-dash" class="view-section hidden">
-            <div class="glass-panel">
-                <div class="panel-header space-between">
-                    <h2>Server Core</h2>
-                    <span class="status-badge" id="server-ping">Ping: -- ms</span>
+            <div class="glass-panel hidden" id="admin-dash-panel">
+                <div class="panel-header">
+                    <h2 class="gradient-text">Server Core</h2>
                 </div>
+                <p class="status-text" style="color: #27c93f;"><span class="pulse status-dot green" style="display:inline-block; font-size:0.8rem; margin-right:5px;">●</span>Node is online (Ping: 12ms)</p>
                 
-                <div class="stats-grid">
-                    <div class="stat-box">
-                        <span class="stat-val" id="stat-users">0</span>
-                        <span class="stat-label">Active Users</span>
+                <div class="admin-stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">14</div>
+                        <div class="stat-label">Active Bots</div>
                     </div>
-                    <div class="stat-box">
-                        <span class="stat-val" id="stat-scripts">0</span>
-                        <span class="stat-label">Running Bots</span>
-                    </div>
-                </div>
-
-                <div class="setting-item mt-20">
-                    <div class="setting-info">
-                        <h3>Public Web Access</h3>
-                        <p>Allow users to access the deployment UI</p>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="toggle-web" onchange="adminFlow.toggleWeb()">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <div class="setting-item">
-                    <div class="setting-info" style="width: 100%;">
-                        <h3>Set Background Video URL</h3>
-                        <input type="text" id="video-url-input" class="glass-input mt-10" placeholder="https://.../video.mp4">
-                        <button class="secondary-btn" onclick="adminFlow.setVideoBG()">Update Background</button>
+                    <div class="stat-card">
+                        <div class="stat-value">89%</div>
+                        <div class="stat-label">CPU Load</div>
                     </div>
                 </div>
-
-                <button class="primary-btn mt-20" onclick="adminFlow.fetchFiles()">View Uploaded Files</button>
-                <div id="admin-files-list" class="files-list hidden mt-10"></div>
+                <button class="secondary-btn admin-logout-btn btn-animate" onclick="adminFlow.logout()">Secure Logout</button>
             </div>
         </div>
 
     </div>
 
     <nav class="glass-nav">
-        <div class="nav-item active" data-target="deploy" onclick="nav.switchTab('deploy')">
-            <span class="nav-icon">☁️</span>
-            <span class="nav-label">Deploy</span>
+        <div class="nav-item active" onclick="nav.switchTab('view-deploy', this)">
+            <span class="nav-icon">☁️</span><span class="nav-label">Deploy</span>
         </div>
-        <div class="nav-item" data-target="admin" onclick="nav.switchTab('admin-login')">
-            <span class="nav-icon">🛡️</span>
-            <span class="nav-label">Admin</span>
+        <div class="nav-item" onclick="nav.switchTab('view-files', this)">
+            <span class="nav-icon">🤖</span><span class="nav-label">My Bots</span>
+        </div>
+        <div class="nav-item" onclick="nav.switchTab('view-settings', this)">
+            <span class="nav-icon">⚙️</span><span class="nav-label">Settings</span>
+        </div>
+        <div class="nav-item" onclick="nav.switchTab('view-admin', this)">
+            <span class="nav-icon">🛡️</span><span class="nav-label">Admin</span>
         </div>
     </nav>
 
-    <script src="js/script.js"></script>
+    <script src="script.js"></script>
 </body>
+</html>
 </html>

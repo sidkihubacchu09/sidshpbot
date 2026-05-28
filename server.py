@@ -1,33 +1,50 @@
-#!/usr/bin/env python3
 import os
 import sys
 import subprocess
 import asyncio
+import psutil
 from flask import Flask, request, jsonify
 
-# --- FIX: static_url_path is set to "" so it serves from the root URL ---
+# Setup Flask to serve the frontend from the 'webapp' folder
 app = Flask(__name__, static_folder="webapp", static_url_path="")
 
 # Core Storage Layout Config
-SESSION_DIR = os.path.abspath("./userbot_sessions")
-SCRIPTS_DIR = os.path.abspath("./userbot_scripts")
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+SESSION_DIR = os.path.join(BASE_DIR, "userbot_sessions")
+SCRIPTS_DIR = os.path.join(BASE_DIR, "userbot_scripts")
 os.makedirs(SESSION_DIR, exist_ok=True)
 os.makedirs(SCRIPTS_DIR, exist_ok=True)
 
-# Application state dictionaries
+# Application state
 ACTIVE_PROCESSES = {}
 PENDING_HANDSHAKES = {}
 
-# --- CRITICAL: Replace these with your actual Telegram API credentials ---
-API_ID = 123456  
-API_HASH = "your_hexadecimal_api_hash_string_here"
+# Telegram API Keys - REPLACE THESE WITH YOURS
+API_ID = 1234567  
+API_HASH = "your_api_hash_here"
 
-# --- Serve the Frontend ---
+# --- Process Management (Imported from sidhostingnew.py) ---
+def kill_process_tree(process_info):
+    """Safely terminate a process and its children using psutil."""
+    try:
+        if 'log_file' in process_info and not process_info['log_file'].closed:
+            process_info['log_file'].close()
+
+        process = process_info.get('process')
+        if process and hasattr(process, 'pid'):
+            parent = psutil.Process(process.pid)
+            children = parent.children(recursive=True)
+            for child in children:
+                child.kill()
+            parent.kill()
+    except Exception as e:
+        print(f"Error killing process: {e}")
+
+# --- API Endpoints ---
 @app.route('/')
 def serve_homepage():
     return app.send_static_file('index.html')
 
-# --- API Endpoints ---
 @app.route('/api/deploy/initiate', methods=['POST'])
 def initiate_handshake():
     data = request.json or {}
@@ -35,7 +52,7 @@ def initiate_handshake():
     script_code = data.get("script")
 
     if not phone or not script_code:
-        return jsonify({"status": "error", "message": "Missing credentials or code payload."}), 400
+        return jsonify({"status": "error", "message": "Missing credentials."}), 400
 
     safe_phone = "".join(c for c in phone if c.isalnum() or c in "+")
     script_path = os.path.join(SCRIPTS_DIR, f"{safe_phone}_main.py")
@@ -67,10 +84,10 @@ def verify_otp_challenge():
     data = request.json or {}
     phone = data.get("phone")
     otp_code = data.get("code")
-    safe_phone = "".join(c for c in phone if c.isalnum() or c in "+") if phone else None
+    safe_phone = "".join(c for c in phone if c.isalnum() or c in "+")
     
     handshake = PENDING_HANDSHAKES.get(safe_phone)
-    if not handshake: return jsonify({"status": "error", "message": "Expired"}), 400
+    if not handshake: return jsonify({"status": "error", "message": "Session expired."}), 400
 
     try:
         asyncio.set_event_loop(handshake["loop"])
@@ -78,7 +95,8 @@ def verify_otp_challenge():
         handshake["loop"].run_until_complete(handshake["client"].sign_in(
             phone=safe_phone, code=otp_code, phone_code_hash=handshake["phone_code_hash"]
         ))
-        trigger_background_node_deployment(safe_phone, handshake["script_path"])
+        trigger_deployment(safe_phone, handshake["script_path"])
+        del PENDING_HANDSHAKES[safe_phone]
         return jsonify({"status": "deployed"})
     except SessionPasswordNeededError:
         return jsonify({"status": "awaiting_2fa"})
@@ -90,41 +108,54 @@ def finalize_cloud_password():
     data = request.json or {}
     phone = data.get("phone")
     password = data.get("password")
-    safe_phone = "".join(c for c in phone if c.isalnum() or c in "+") if phone else None
-    handshake = PENDING_HANDSHAKES.get(safe_phone)
+    safe_phone = "".join(c for c in phone if c.isalnum() or c in "+")
     
+    handshake = PENDING_HANDSHAKES.get(safe_phone)
     if not handshake: return jsonify({"status": "error", "message": "Expired"}), 400
 
     try:
         asyncio.set_event_loop(handshake["loop"])
         handshake["loop"].run_until_complete(handshake["client"].sign_in(password=password))
-        trigger_background_node_deployment(safe_phone, handshake["script_path"])
+        trigger_deployment(safe_phone, handshake["script_path"])
         del PENDING_HANDSHAKES[safe_phone]
         return jsonify({"status": "deployed"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 401
 
-def trigger_background_node_deployment(phone_key, script_file_path):
-    log_file_handle = open(f"{script_file_path}.log", "w", encoding="utf-8")
+def trigger_deployment(phone_key, script_file_path):
+    log_path = f"{script_file_path}.log"
+    log_file_handle = open(log_path, "w", encoding="utf-8")
     proc = subprocess.Popen([sys.executable, script_file_path], stdout=log_file_handle, stderr=subprocess.STDOUT)
-    ACTIVE_PROCESSES[phone_key] = proc
+    ACTIVE_PROCESSES[phone_key] = {
+        'process': proc,
+        'log_file': log_file_handle,
+        'log_path': log_path
+    }
 
 @app.route('/api/bot/control', methods=['POST'])
 def control_threads():
     data = request.json or {}
     phone = data.get("phone")
     action = data.get("action")
-    safe_phone = "".join(c for c in phone if c.isalnum() or c in "+") if phone else None
+    safe_phone = "".join(c for c in phone if c.isalnum() or c in "+")
     
+    process_info = ACTIVE_PROCESSES.get(safe_phone)
+
     if action == "stop":
-        proc = ACTIVE_PROCESSES.pop(safe_phone, None)
-        if proc: proc.terminate()
-        return jsonify({"status": "stopped"})
+        if process_info:
+            kill_process_tree(process_info)
+            ACTIVE_PROCESSES.pop(safe_phone, None)
+            return jsonify({"status": "stopped"})
+        return jsonify({"status": "error", "message": "Not running."})
+        
     elif action == "logs":
         log_path = os.path.join(SCRIPTS_DIR, f"{safe_phone}_main.py.log")
-        logs = open(log_path, "r").read() if os.path.exists(log_path) else "No logs yet."
-        return jsonify({"status": "success", "logs": logs})
-    return jsonify({"status": "error"}), 400
+        if os.path.exists(log_path):
+            with open(log_path, "r", encoding="utf-8") as f:
+                # Read last 100 lines for terminal
+                lines = f.readlines()[-100:]
+                return jsonify({"status": "success", "logs": "".join(lines)})
+        return jsonify({"status": "success", "logs": "[System] No logs generated yet."})
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))

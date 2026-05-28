@@ -1,1 +1,40 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProBot Hosting</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <div class="glass-panel" id="step1-script">
+        <h2>Deploy UserBot</h2>
+        <p class="status-text">Paste your bot script below to begin hosting.</p>
+        <textarea id="scriptInput" placeholder="# Enter your code here..."></textarea>
+    </div>
+
+    <div class="glass-panel hidden" id="step2-otp">
+        <h2>Authentication</h2>
+        <p class="status-text">Enter the 5-digit code sent to your Telegram app.</p>
+        <input type="number" id="otpInput" placeholder="12345">
+    </div>
+
+    <div class="glass-panel hidden" id="step3-password">
+        <h2>2-Step Verification</h2>
+        <p class="status-text">Your account has 2FA enabled. Enter your password.</p>
+        <input type="password" id="passwordInput" placeholder="Password">
+    </div>
+
+    <div class="glass-panel hidden" id="step4-success">
+        <h2>System Active</h2>
+        <p class="status-text" style="color: #4ade80;">UserBot is now successfully running!</p>
+    </div>
+
+    <script src="js/script.js"></script>
+</body>
+</html>

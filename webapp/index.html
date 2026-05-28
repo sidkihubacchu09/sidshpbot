@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ProBot Hosting</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ProBot Hosting - Ultimate</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
@@ -12,28 +11,156 @@
 </head>
 <body>
 
-    <div class="glass-panel" id="step1-script">
-        <h2>Deploy UserBot</h2>
-        <p class="status-text">Paste your bot script below to begin hosting.</p>
-        <textarea id="scriptInput" placeholder="# Enter your code here..."></textarea>
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+    <div class="bg-shape shape-3"></div>
+
+    <div class="app-container">
+
+        <div id="view-deploy" class="view-section active">
+            
+            <div class="glass-panel" id="step1-script">
+                <div class="panel-header">
+                    <span class="icon">🚀</span>
+                    <h2>Deploy UserBot</h2>
+                </div>
+                <p class="status-text">Paste your Python/JS script to host it permanently.</p>
+                
+                <div class="code-editor-wrapper">
+                    <div class="editor-header">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                        <span class="filename">main.py</span>
+                    </div>
+                    <textarea id="scriptInput" spellcheck="false" placeholder="# Import Telethon/Pyrogram&#10;from telethon import TelegramClient&#10;&#10;api_id = 123456&#10;api_hash = 'your_api_hash'&#10;&#10;print('Bot Starting...')"></textarea>
+                </div>
+
+                <button class="primary-btn" id="btn-deploy" onclick="deployFlow.nextToOTP()">
+                    <span class="btn-text">Initialize Server</span>
+                    <div class="spinner"></div>
+                </button>
+            </div>
+
+            <div class="glass-panel hidden" id="step2-otp">
+                <div class="panel-header">
+                    <span class="icon">🔐</span>
+                    <h2>Authentication</h2>
+                </div>
+                <p class="status-text">We sent a 5-digit login code to your Telegram app. Enter it below to link your session.</p>
+                <div class="input-group">
+                    <input type="number" id="otpInput" placeholder="Enter 5-digit code" autocomplete="off">
+                </div>
+                <button class="primary-btn" id="btn-otp" onclick="deployFlow.nextToPassword()">
+                    <span class="btn-text">Verify Code</span>
+                    <div class="spinner"></div>
+                </button>
+                <button class="secondary-btn" onclick="deployFlow.goBack('step2-otp', 'step1-script')">Cancel</button>
+            </div>
+
+            <div class="glass-panel hidden" id="step3-password">
+                <div class="panel-header">
+                    <span class="icon">🛡️</span>
+                    <h2>2-Step Verification</h2>
+                </div>
+                <p class="status-text">Your account is protected by 2FA. Enter your Cloud Password.</p>
+                <div class="input-group">
+                    <input type="password" id="passwordInput" placeholder="Cloud Password">
+                </div>
+                <button class="primary-btn" id="btn-pass" onclick="deployFlow.finalize()">
+                    <span class="btn-text">Decrypt & Boot</span>
+                    <div class="spinner"></div>
+                </button>
+            </div>
+
+            <div class="glass-panel hidden text-center" id="step4-success">
+                <div class="success-ring">
+                    <span class="success-check">✓</span>
+                </div>
+                <h2 class="gradient-text">System Online</h2>
+                <p class="status-text">Your UserBot session is securely generated and the script is running in the cloud.</p>
+                <button class="primary-btn" onclick="nav.switchTab('logs')">View Live Logs</button>
+            </div>
+
+        </div>
+
+        <div id="view-logs" class="view-section hidden">
+            <div class="glass-panel h-100">
+                <div class="panel-header space-between">
+                    <div class="flex-row">
+                        <span class="icon">📜</span>
+                        <h2>Live Terminal</h2>
+                    </div>
+                    <span class="status-badge pulse">Running</span>
+                </div>
+                <div class="terminal-window" id="terminal-output">
+                    <div class="log-line system">[System] Connecting to Secure Host...</div>
+                    <div class="log-line system">[System] Awaiting script deployment...</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-settings" class="view-section hidden">
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <span class="icon">⚙️</span>
+                    <h2>Bot Settings</h2>
+                </div>
+                
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <h3>Auto-Restart</h3>
+                        <p>Restart script if it crashes</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <h3>Stealth Mode</h3>
+                        <p>Hide typing status on commands</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <h3>Log Level</h3>
+                        <p>Terminal verbosity</p>
+                    </div>
+                    <select class="glass-select">
+                        <option>INFO</option>
+                        <option>WARNING</option>
+                        <option>DEBUG</option>
+                    </select>
+                </div>
+
+                <button class="primary-btn mt-20" onclick="tg.close()">Save & Close App</button>
+            </div>
+        </div>
+
     </div>
 
-    <div class="glass-panel hidden" id="step2-otp">
-        <h2>Authentication</h2>
-        <p class="status-text">Enter the 5-digit code sent to your Telegram app.</p>
-        <input type="number" id="otpInput" placeholder="12345">
-    </div>
-
-    <div class="glass-panel hidden" id="step3-password">
-        <h2>2-Step Verification</h2>
-        <p class="status-text">Your account has 2FA enabled. Enter your password.</p>
-        <input type="password" id="passwordInput" placeholder="Password">
-    </div>
-
-    <div class="glass-panel hidden" id="step4-success">
-        <h2>System Active</h2>
-        <p class="status-text" style="color: #4ade80;">UserBot is now successfully running!</p>
-    </div>
+    <nav class="glass-nav">
+        <div class="nav-item active" data-target="deploy" onclick="nav.switchTab('deploy')">
+            <span class="nav-icon">☁️</span>
+            <span class="nav-label">Deploy</span>
+        </div>
+        <div class="nav-item" data-target="logs" onclick="nav.switchTab('logs')">
+            <span class="nav-icon">💻</span>
+            <span class="nav-label">Logs</span>
+        </div>
+        <div class="nav-item" data-target="settings" onclick="nav.switchTab('settings')">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">Config</span>
+        </div>
+    </nav>
 
     <script src="js/script.js"></script>
 </body>

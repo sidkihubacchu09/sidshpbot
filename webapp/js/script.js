@@ -1,298 +1,210 @@
-// Local Database State Initialization 
-if (!localStorage.getItem('sid_initialized')) {
-    localStorage.setItem('sid_bots', JSON.stringify([]));
-    localStorage.setItem('sid_wallet', '0.00');
-    localStorage.setItem('sid_premium', 'false');
-    localStorage.setItem('sid_initialized', 'true');
-}
+/**
+ * SID HOSTING APPLICATION HUB INTERFACE
+ * Handles active user states, API connection callbacks, background modifications, and dynamic web telemetry.
+ */
 
-function updateStoredBots(bots) {
-    localStorage.setItem('sid_bots', JSON.stringify(bots));
-    renderBotDashboard();
-}
+class AppEngine {
+    constructor() {
+        this.apiBase = window.location.origin;
+        this.userId = 12345678; // Fallback demo tracking parameters
+        this.currentUploadedScript = null;
 
-function calculateUptime(startTime) {
-    if (!startTime) return '0m';
-    const diffMins = Math.floor((Date.now() - startTime) / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    return diffHours > 0 ? `${diffHours}h ${diffMins % 60}m` : `${diffMins}m`;
-}
-
-// Layout Switch Tab Controllers
-const nav = {
-    switchTab: function(tabId, element) {
-        document.querySelectorAll('.view-section').forEach(s => s.classList.add('hidden'));
-        const target = document.getElementById(tabId);
-        if (target) target.classList.remove('hidden');
-
-        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-        if (element) element.classList.add('active');
-
-        if (tabId === 'view-files') renderBotDashboard();
-        if (tabId === 'view-settings') appSettings.loadDashboard();
-    }
-};
-
-// Orchestrated Script Upload and Multi-Step Verification Flow
-const deployFlow = {
-    tempData: { phone: '', script: '', fileName: 'main.py', apiId: '', apiHash: '' },
-
-    handleFileUpload: function(event) {
-        const file = event.target.files[0];
-        if (file) {
-            this.tempData.fileName = file.name;
-            document.getElementById('targetFileNameDisplay').value = file.name;
-            
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const scriptText = e.target.result;
-                document.getElementById('scriptInput').value = scriptText;
-                this.extractLocalCredentials(scriptText);
-            };
-            reader.readAsText(file);
-        }
-    },
-
-    extractLocalCredentials: function(text) {
-        // Automatically check script environment configuration for embedded access pairs
-        const idMatch = text.match(/(?:API_ID)\s*=\s*['"]?(\d+)['"]?/i);
-        const hashMatch = text.match(/(?:API_HASH)\s*=\s*['"]?([a-fA-F0-9]{32})['"]/i);
-        if (idMatch) this.tempData.apiId = idMatch[1];
-        if (hashMatch) this.tempData.apiHash = hashMatch[1];
-    },
-
-    nextToOTP: function() {
-        this.tempData.fileName = document.getElementById('targetFileNameDisplay').value.trim() || 'main.py';
-        this.tempData.script = document.getElementById('scriptInput').value.trim();
-        this.tempData.phone = document.getElementById('phoneInput').value.trim();
-
-        if (!this.tempData.script) {
-            alert('❌ Verification Error: Source script text environment cannot be blank.');
-            return;
-        }
-        if (!this.tempData.phone) {
-            alert('❌ Route Error: A routing phone node assignment identifier context is required.');
-            return;
-        }
-
-        // Parse verification text for internal configurations dynamically if changed inside editing pane
-        this.extractLocalCredentials(this.tempData.script);
-
-        document.getElementById('step1-script').classList.add('hidden');
-        document.getElementById('step2-otp').classList.remove('hidden');
-    },
-
-    nextToPassword: function() {
-        const otpToken = document.getElementById('otpInput').value.trim();
-        if (!otpToken) {
-            alert('❌ Security Warning: Verification credential packet payload cannot be blank.');
-            return;
-        }
-        document.getElementById('step2-otp').classList.add('hidden');
-        document.getElementById('step3-password').classList.remove('hidden');
-    },
-
-    finalize: async function() {
-        const btn = document.getElementById('btn-pass');
-        const passwordVal = document.getElementById('passwordInput').value.trim();
-        const otpToken = document.getElementById('otpInput').value.trim();
-        
-        btn.disabled = true;
-
-        try {
-            // Deliver complete system deployment profiles directly to server API backend
-            const response = await fetch('/api/deploy', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    fileName: this.tempData.fileName,
-                    scriptSource: this.tempData.script,
-                    phone: this.tempData.phone,
-                    otp: otpToken,
-                    password: passwordVal,
-                    apiId: this.tempData.apiId,
-                    apiHash: this.tempData.apiHash
-                })
-            });
-            
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Server rejected container bundle setup.');
-
-            const currentBots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
-            const newBotId = 'bot_' + Date.now();
-            
-            currentBots.push({
-                id: newBotId,
-                name: this.tempData.fileName,
-                status: 'Stopped',
-                uptime: '0m',
-                ram: '0MB',
-                startTime: null,
-                traits: { type: 'Live Telethon Userbot Task' }
-            });
-            
-            updateStoredBots(currentBots);
-
-            document.getElementById('step3-password').classList.add('hidden');
-            document.getElementById('step4-success').classList.remove('hidden');
-
-            // Fire activation pipeline initialization block
-            setTimeout(() => { this.triggerEngineStart(newBotId, this.tempData.fileName); }, 800);
-        } catch (err) {
-            alert(`❌ Compilation Pipeline Halted: ${err.message}`);
-        } finally {
-            btn.disabled = false;
-        }
-    },
-
-    triggerEngineStart: async function(botId, fileName) {
-        await fetch('/api/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ botId, fileName })
-        });
-        toggleBotStateInUI(botId, 'Running', Date.now());
-    },
-
-    goBack: function(from, to) {
-        document.getElementById(from).classList.add('hidden');
-        document.getElementById(to).classList.remove('hidden');
-    },
-
-    reset: function() {
-        document.getElementById('scriptInput').value = '';
-        document.getElementById('phoneInput').value = '';
-        document.getElementById('otpInput').value = '';
-        document.getElementById('passwordInput').value = '';
-        document.getElementById('step4-success').classList.add('hidden');
-        document.getElementById('step1-script').classList.remove('hidden');
-    }
-};
-
-function toggleBotStateInUI(botId, status, startTime) {
-    let bots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
-    bots = bots.map(b => {
-        if (b.id === botId) {
-            b.status = status;
-            b.startTime = startTime;
-            b.ram = status === 'Running' ? '18MB' : '0MB';
-        }
-        return b;
-    });
-    updateStoredBots(bots);
-}
-
-async function toggleBotState(botId) {
-    const bots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
-    const target = bots.find(b => b.id === botId);
-    if (!target) return;
-
-    if (target.status !== 'Running') {
-        const res = await fetch('/api/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ botId, fileName: target.name })
-        });
-        if (res.ok) toggleBotStateInUI(botId, 'Running', Date.now());
-    } else {
-        await fetch('/api/stop', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ botId })
-        });
-        toggleBotStateInUI(botId, 'Stopped', null);
-    }
-}
-
-async function deleteBotAsset(botId) {
-    const bots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
-    const target = bots.find(b => b.id === botId);
-    if (!target) return;
-
-    if (target.status === 'Running') {
-        await fetch('/api/stop', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ botId })
-        });
-    }
-    updateStoredBots(bots.filter(b => b.id !== botId));
-}
-
-function renderBotDashboard() {
-    const bots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
-    const container = document.getElementById('bots-list-container');
-    const counter = document.getElementById('bot-running-counter');
-    if (!container) return;
-
-    const updatedBots = bots.map(b => {
-        if (b.status === 'Running' && b.startTime) b.uptime = calculateUptime(b.startTime);
-        return b;
-    });
-
-    if (counter) {
-        counter.innerText = `🟢 ${updatedBots.filter(b => b.status === 'Running').length} / ${updatedBots.length} Deployed Threads Active`;
-    }
-
-    container.innerHTML = updatedBots.length === 0 
-        ? `<p style="text-align:center; color:var(--text-muted); padding:24px;">No script templates registered to local machine engine storage node.</p>`
-        : '';
-
-    updatedBots.forEach(bot => {
-        const isRunning = bot.status === 'Running';
-        const div = document.createElement('div');
-        div.className = 'file-item';
-        div.innerHTML = `
-            <div>
-                <div class="file-name">${bot.name} <span style="font-size:11px; color:var(--text-muted); font-weight:normal;">(${bot.traits.type})</span></div>
-                <div class="file-status">${bot.status} • Runtime: ${isRunning ? bot.uptime : '0m'} • Compute: ${bot.ram}</div>
-            </div>
-            <div>
-                <button class="action-btn" onclick="terminal.open('${bot.id}')">📝 Logs</button>
-                <button class="action-btn" onclick="toggleBotState('${bot.id}')" style="color: ${isRunning ? '#ffd700' : '#34d399'}">${isRunning ? '🔄 Restart' : '▶ Start'}</button>
-                <button class="action-btn danger" onclick="deleteBotAsset('${bot.id}')">${isRunning ? '⏹ Stop' : '🗑 Delete'}</button>
-            </div>
-        `;
-        container.appendChild(div);
-    });
-}
-
-let logInterval = null;
-const terminal = {
-    open: function(botId) {
-        if (logInterval) clearInterval(logInterval);
-        const modal = document.getElementById('terminal-modal');
-        modal.classList.remove('hidden');
-
-        logInterval = setInterval(async () => {
-            try {
-                const res = await fetch(`/api/logs/${botId}`);
-                const data = await res.json();
-                document.getElementById('terminal-output').innerHTML = data.logs.map(l => `<div class="log-line">${l}</div>`).join('');
-                document.getElementById('terminal-output').scrollTop = document.getElementById('terminal-output').scrollHeight;
-            } catch (e) {
-                document.getElementById('terminal-output').innerHTML = `<div class="log-line" style="color:var(--color-danger)">[ERR] Server streaming interface connection drops detected.</div>`;
+        // Initialize connection mapping safely with Telegram WebApp ecosystem
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+            if (window.Telegram.WebApp.initDataUnsafe?.user) {
+                this.userId = window.Telegram.WebApp.initDataUnsafe.user.id;
             }
-        }, 1000);
-    },
-    close: function() {
-        document.getElementById('terminal-modal').classList.add('hidden');
-        if (logInterval) clearInterval(logInterval);
-        renderBotDashboard();
+        }
     }
-};
 
-const appSettings = {
-    loadDashboard: function() {
-        const premium = localStorage.getItem('sid_premium') === 'true';
-        document.getElementById('settings-account-status').innerText = premium ? '💎 Premium Cluster Pro Member' : 'Standard Node Edition';
-        document.getElementById('settings-wallet-balance').innerText = `$${localStorage.getItem('sid_wallet') || '0.00'}`;
-    },
-    purchasePremium: function() {
-        localStorage.setItem('sid_premium', 'true');
-        localStorage.setItem('sid_wallet', '150.00');
-        this.loadDashboard();
+    init() {
+        console.log("Initializing Dashboard Script Interface Core...");
+        this.synchronizeTelemetry();
+        // Periodically pull live instance logging buffers
+        setInterval(() => this.synchronizeTelemetry(), 5000);
     }
-};
 
-document.addEventListener('DOMContentLoaded', () => { renderBotDashboard(); });
+    // Handle view section swaps via navigation dock
+    navigateView(element, viewId) {
+        document.querySelectorAll('.dock-item').forEach(item => item.classList.remove('active'));
+        document.querySelectorAll('.view-section').forEach(view => view.classList.remove('active'));
+        
+        element.classList.add('active');
+        document.getElementById(viewId).classList.add('active');
+    }
+
+    switchPanel(currentId, targetId) {
+        document.getElementById(currentId).classList.add('hidden');
+        document.getElementById(targetId).classList.remove('hidden');
+    }
+
+    handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        this.currentUploadedScript = file.name;
+        document.getElementById('filename-display').innerHTML = `<i class="fa-solid fa-file-arrow-up text-green"></i> ${file.name}`;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            document.getElementById('scriptInput').value = e.target.result;
+        };
+        reader.readAsText(file);
+    }
+
+    // Step 1: Submit Code and initialization criteria to Python Async Worker
+    initiateConnection() {
+        const phone = document.getElementById('phoneInput').value;
+        const apiId = document.getElementById('apiIdInput').value;
+        const apiHash = document.getElementById('apiHashInput').value;
+        const scriptCode = document.getElementById('scriptInput').value;
+
+        if (!phone || !apiId || !apiHash || !scriptCode) {
+            alert("⚠️ Matrix Configuration Error: Ensure Phone, credentials, and script assets are loaded.");
+            return;
+        }
+
+        this.setButtonLoading('btn-deploy', true);
+
+        fetch(`${this.apiBase}/api/deploy/initiate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: this.userId,
+                phone: phone,
+                api_id: apiId,
+                api_hash: apiHash,
+                script: scriptCode
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            this.setButtonLoading('btn-deploy', false);
+            if (data.status === "otp_required") {
+                document.getElementById('otp-phone-display').innerText = `Dynamic session authorization node dispatched to ${phone}`;
+                this.switchPanel('step1-script', 'step2-otp');
+            } else {
+                alert(`❌ Engine rejection callback: ${data.message}`);
+            }
+        })
+        .catch(err => {
+            this.setButtonLoading('btn-deploy', false);
+            alert("❌ System loop failure tracking connection.");
+        });
+    }
+
+    // Step 2: Submit Received Session Code Token
+    verifyOTP() {
+        const otpCode = document.getElementById('otpInput').value;
+        if (!otpCode) return alert("Please specify the verification token code.");
+
+        this.setButtonLoading('btn-otp', true);
+
+        fetch(`${this.apiBase}/api/deploy/verify-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: this.userId, otp: otpCode })
+        })
+        .then(res => res.json())
+        .then(data => {
+            this.setButtonLoading('btn-otp', false);
+            if (data.status === "password_required") {
+                this.switchPanel('step2-otp', 'step3-password');
+            } else if (data.status === "success") {
+                alert("🚀 Secure instance successfully compiled! Active cluster allocation processing.");
+                window.location.reload();
+            } else {
+                alert(`❌ Token error: ${data.message}`);
+            }
+        });
+    }
+
+    // Step 3: Authenticate Cloud Password
+    verifyPassword() {
+        const cloudPassword = document.getElementById('passwordInput').value;
+        if (!cloudPassword) return alert("2-Step Verification String Required.");
+
+        this.setButtonLoading('btn-password', true);
+
+        fetch(`${this.apiBase}/api/deploy/verify-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: this.userId, password: cloudPassword })
+        })
+        .then(res => res.json())
+        .then(data => {
+            this.setButtonLoading('btn-password', false);
+            if (data.status === "success") {
+                alert("🚀 Secure instance initialized. Pipeline running!");
+                this.switchPanel('step3-password', 'step1-script');
+            } else {
+                alert(`❌ Execution runtime fault: ${data.message}`);
+            }
+        });
+    }
+
+    // Administrative Wallpaper Engine Management Function
+    applyBackgroundVideo() {
+        const videoUrl = document.getElementById('adminVideoInput').value;
+        if (!videoUrl) return alert("Provide a target background streaming link.");
+
+        fetch(`${this.apiBase}/api/admin/set-background`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: this.userId, video_url: videoUrl })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                const videoElement = document.getElementById('bg-video');
+                videoElement.src = videoUrl;
+                videoElement.load();
+                videoElement.play().catch(e => console.log("Wallpaper pipeline hot reloaded."));
+                alert("🎯 Application backdrop wallpaper updated across environments.");
+            } else {
+                alert("❌ Administrative request access denied.");
+            }
+        });
+    }
+
+    synchronizeTelemetry() {
+        fetch(`${this.apiBase}/api/telemetry?user_id=${this.userId}`)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('dash-status').innerText = data.runtime_status || "Offline";
+            document.getElementById('dash-slots').innerText = `${data.file_count || 0} / ${data.limit || 10} Clusters`;
+            document.getElementById('dash-role').innerText = data.role_title || "Standard Tier";
+            
+            if (data.bg_video) {
+                const videoElement = document.getElementById('bg-video');
+                if (!videoElement.src.includes(data.bg_video)) {
+                    videoElement.src = data.bg_video;
+                }
+            }
+
+            if (data.logs) {
+                document.getElementById('terminal-logs').innerHTML = data.logs.join("<br>");
+            }
+        }).catch(() => {});
+    }
+
+    setButtonLoading(btnId, isLoading) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        if (isLoading) {
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+        } else {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        }
+    }
+
+    triggerGlobalLock() { alert("🔒 Main Cluster Ecosystem lockdown initiated via Admin Token."); }
+    clearOrphanProcesses() { alert("🧹 Closed process transaction threads cleared."); }
+}
+
+const appEngine = new AppEngine();
+document.addEventListener('DOMContentLoaded', () => appEngine.init());

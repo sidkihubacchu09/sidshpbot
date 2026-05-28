@@ -55,7 +55,7 @@ YOUR_USERNAME = '@Xricx0'
 UPDATE_CHANNEL = 'https://t.me/+5uCnxp3U1gMwZjQ1'
 
 # 👇 PUT YOUR WEB APP URL HERE
-WEB_APP_URL = 'https://your-webapp-url.com'
+WEB_APP_URL = 'worker-production-69b2.up.railway.app'
 
 # Folder setup - using absolute paths
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))

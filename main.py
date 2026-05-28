@@ -23,29 +23,159 @@ import mimetypes
 import struct
 import importlib.util
 import asyncio
+
+# --- Telethon Imports ---
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, PasswordHashInvalidError
 
-# --- Flask Web App Server ---
-from flask import Flask, render_template
+# --- Flask Imports ---
+from flask import Flask, render_template, request, jsonify
 from threading import Thread
 
-# Securely host the Web App files from a specific folder
+# --- Flask Web App Server & Telethon Auth Bridge ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 WEBAPP_DIR = os.path.join(BASE_DIR, 'webapp')
-
-# Automatically create the required folders if they don't exist
 os.makedirs(os.path.join(WEBAPP_DIR, 'css'), exist_ok=True)
 os.makedirs(os.path.join(WEBAPP_DIR, 'js'), exist_ok=True)
 
 app = Flask('', template_folder='webapp', static_folder='webapp', static_url_path='/')
 
+# --- App State Variables ---
+app_state = {
+    "web_enabled": True,
+    "video_bg": "https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4"
+}
+
+# --- Telethon Async Loop Setup ---
+telethon_loop = asyncio.new_event_loop()
+pending_auth_clients = {} 
+user_saved_scripts = {}
+
+def start_background_loop(loop):
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
+
+threading.Thread(target=start_background_loop, args=(telethon_loop,), daemon=True).start()
+
+def async_to_sync(coro):
+    future = asyncio.run_coroutine_threadsafe(coro, telethon_loop)
+    return future.result()
+
 @app.route('/')
 def home():
+    try: return render_template('index.html')
+    except: return "Web App is running! Place index.html in the 'webapp' folder."
+
+# --- PUBLIC ROUTES ---
+@app.route('/api/public/status', methods=['GET'])
+def api_public_status():
+    return jsonify(app_state)
+
+# --- USER DEPLOY ROUTES ---
+@app.route('/api/request_code', methods=['POST'])
+def api_request_code():
+    if not app_state["web_enabled"]: return jsonify({"status": "error", "message": "Web access disabled by Admin."})
+    data = request.json
+    phone = data.get('phone')
+    script_text = data.get('script')
+    
+    api_id, api_hash = extract_credentials_from_text(script_text)
+    if not api_id or not api_hash:
+        return jsonify({"status": "error", "message": "Could not find api_id or api_hash in script."})
+    
+    user_saved_scripts[phone] = script_text 
+    session_file = os.path.join(UPLOAD_BOTS_DIR, f"session_{phone.replace('+', '')}")
+    client = TelegramClient(session_file, int(api_id), api_hash, loop=telethon_loop)
+    pending_auth_clients[phone] = client
+
+    async def send_auth_code():
+        await client.connect()
+        return await client.send_code_request(phone)
+
     try:
-        return render_template('index.html')
-    except Exception as e:
-        return "Web App is running! Please place your index.html inside the 'webapp' folder."
+        result = async_to_sync(send_auth_code())
+        return jsonify({"status": "success", "phone_code_hash": result.phone_code_hash})
+    except Exception as e: return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/api/verify_code', methods=['POST'])
+def api_verify_code():
+    data = request.json
+    phone = data.get('phone')
+    code = data.get('code')
+    phone_code_hash = data.get('phone_code_hash')
+    
+    client = pending_auth_clients.get(phone)
+    if not client: return jsonify({"status": "error", "message": "Session expired."})
+
+    async def verify():
+        try:
+            await client.sign_in(phone, code, phone_code_hash=phone_code_hash)
+            return "success"
+        except SessionPasswordNeededError: return "password_required"
+        except Exception as e: return str(e)
+
+    result = async_to_sync(verify())
+    if result in ["success", "password_required"]: return jsonify({"status": result})
+    return jsonify({"status": "error", "message": result})
+
+@app.route('/api/verify_password', methods=['POST'])
+def api_verify_password():
+    data = request.json
+    phone = data.get('phone')
+    password = data.get('password')
+    
+    client = pending_auth_clients.get(phone)
+    if not client: return jsonify({"status": "error", "message": "Session expired."})
+
+    async def verify_pass(): await client.sign_in(password=password)
+    try:
+        async_to_sync(verify_pass())
+        return jsonify({"status": "success"})
+    except Exception as e: return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/api/start_bot', methods=['POST'])
+def api_start_bot():
+    phone = request.json.get('phone')
+    if phone in pending_auth_clients:
+        async_to_sync(pending_auth_clients[phone].disconnect()) 
+        del pending_auth_clients[phone]
+    
+    return jsonify({"status": "success"})
+
+# --- ADMIN ROUTES (Protected by 'sid999') ---
+def check_admin():
+    return request.headers.get('Authorization') == 'sid999'
+
+@app.route('/api/admin/stats', methods=['GET'])
+def api_admin_stats():
+    if not check_admin(): return jsonify({"error": "Unauthorized"}), 401
+    
+    running_count = sum(1 for s in bot_scripts.values() if s.get('process') and s['process'].poll() is None)
+    return jsonify({
+        "active_users": len(active_users),
+        "running_bots": running_count,
+        "web_enabled": app_state["web_enabled"]
+    })
+
+@app.route('/api/admin/toggle_web', methods=['POST'])
+def api_admin_toggle_web():
+    if not check_admin(): return jsonify({"error": "Unauthorized"}), 401
+    app_state["web_enabled"] = request.json.get('state', True)
+    return jsonify({"status": "success"})
+
+@app.route('/api/admin/set_bg', methods=['POST'])
+def api_admin_set_bg():
+    if not check_admin(): return jsonify({"error": "Unauthorized"}), 401
+    app_state["video_bg"] = request.json.get('url', '')
+    return jsonify({"status": "success"})
+
+@app.route('/api/admin/files', methods=['GET'])
+def api_admin_files():
+    if not check_admin(): return jsonify({"error": "Unauthorized"}), 401
+    files_list = []
+    for uid, f_list in user_files.items():
+        for fname, _ in f_list: files_list.append(f"User {uid}: {fname}")
+    return jsonify({"files": files_list})
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -55,7 +185,7 @@ def keep_alive():
     t = Thread(target=run_flask)
     t.daemon = True
     t.start()
-    print("Flask Web App server started.")
+    print("Flask Web App API server started.")
 # --- End Flask Web App Server ---
 
 # --- Configuration ---
@@ -238,10 +368,6 @@ def set_menu_video_db(file_id):
             logger.error(f"Error saving menu video DB: {e}")
 
 # --- TELETHON CORE ENGINE CORES ---
-def start_asyncio_loop(loop, coro):
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(coro)
-
 async def deploy_custom_runtime(chat_id, uid, state):
     script_path = state["script_path"]
     user_api_id = state["api_id"]
@@ -499,7 +625,6 @@ def kill_process_tree(process_info):
         logger.error(f"❌ Unexpected error killing process tree for PID {pid or 'N/A'} ({script_key}): {e}", exc_info=True)
 
 # --- Automatic Package Installation & Script Running ---
-
 def attempt_install_pip(module_name, message):
     package_name = TELEGRAM_MODULES.get(module_name.lower(), module_name) 
     if package_name is None: 
@@ -780,7 +905,6 @@ def run_js_script(script_path, script_owner_id, user_folder, file_name, message_
              kill_process_tree(bot_scripts[script_key])
              del bot_scripts[script_key]
 
-# --- Map Telegram import names to actual PyPI package names ---
 TELEGRAM_MODULES = {
     'telebot': 'pyTelegramBotAPI',
     'telegram': 'python-telegram-bot',
@@ -793,34 +917,6 @@ TELEGRAM_MODULES = {
     'telepot': 'telepot',
     'pytg': 'pytg',
     'tgcrypto': 'tgcrypto',
-    'telegram_upload': 'telegram-upload',
-    'telegram_send': 'telegram-send',
-    'telegram_text': 'telegram-text',
-    'mtproto': 'telegram-mtproto',
-    'tl': 'telethon',
-    'telegram_utils': 'telegram-utils',
-    'telegram_logger': 'telegram-logger',
-    'telegram_handlers': 'python-telegram-handlers',
-    'telegram_redis': 'telegram-redis',
-    'telegram_sqlalchemy': 'telegram-sqlalchemy',
-    'telegram_payment': 'telegram-payment',
-    'telegram_shop': 'telegram-shop-sdk',
-    'pytest_telegram': 'pytest-telegram',
-    'telegram_debug': 'telegram-debug',
-    'telegram_scraper': 'telegram-scraper',
-    'telegram_analytics': 'telegram-analytics',
-    'telegram_nlp': 'telegram-nlp-toolkit',
-    'telegram_ai': 'telegram-ai',
-    'telegram_api': 'telegram-api-client',
-    'telegram_web': 'telegram-web-integration',
-    'telegram_games': 'telegram-games',
-    'telegram_quiz': 'telegram-quiz-bot',
-    'telegram_ffmpeg': 'telegram-ffmpeg',
-    'telegram_media': 'telegram-media-utils',
-    'telegram_2fa': 'telegram-twofa',
-    'telegram_crypto': 'telegram-crypto-bot',
-    'telegram_i18n': 'telegram-i18n',
-    'telegram_translate': 'telegram-translate',
     'bs4': 'beautifulsoup4',
     'requests': 'requests',
     'pillow': 'Pillow',
@@ -833,24 +929,7 @@ TELEGRAM_MODULES = {
     'flask': 'Flask',
     'django': 'Django',
     'sqlalchemy': 'SQLAlchemy',
-    'asyncio': None,
-    'json': None,
-    'datetime': None,
-    'os': None,
-    'sys': None,
-    're': None,
-    'time': None,
-    'math': None,
-    'random': None,
-    'logging': None,
-    'threading': None,
-    'subprocess': None,
-    'zipfile': None,
-    'tempfile': None,
-    'shutil': None,
-    'sqlite3': None,
     'psutil': 'psutil',
-    'atexit': None
 }
 # --- End Automatic Package Installation & Script Running ---
 
@@ -1088,7 +1167,6 @@ def handle_zip_file(downloaded_file_content, file_name_zip, message):
     user_folder = get_user_folder(user_id)
     temp_dir = None
     
-    # Security check for ZIP files (except owner)
     if user_id != OWNER_ID:
         is_safe, reason = scan_file_for_malware(downloaded_file_content, file_name_zip, user_id)
         if not is_safe:
@@ -1102,9 +1180,7 @@ def handle_zip_file(downloaded_file_content, file_name_zip, message):
         with open(zip_path, 'wb') as new_file:
             new_file.write(downloaded_file_content)
         
-        # Open Zip to Extract
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            # Additional security check on content
             if user_id != OWNER_ID:
                 for member in zip_ref.infolist():
                     member_name_lower = member.filename.lower()
@@ -1113,46 +1189,35 @@ def handle_zip_file(downloaded_file_content, file_name_zip, message):
                         bot.reply_to(message, f"🚨 Security Alert: ZIP contains suspicious file: {member.filename}\nOnly owner can upload such files.")
                         return
                     
-                    # Check for path traversal
                     member_path = os.path.abspath(os.path.join(temp_dir, member.filename))
                     if not member_path.startswith(os.path.abspath(temp_dir)):
                         raise zipfile.BadZipFile(f"Zip has unsafe path: {member.filename}")
             
-            # Extract everything
             zip_ref.extractall(temp_dir)
             logger.info(f"Extracted zip to {temp_dir}")
 
-        # --- FIX: Recursively find script if not in root (ignores __MACOSX) ---
         target_dir = temp_dir
         root_files = os.listdir(target_dir)
         
-        # Check if script exists in root
         if not any(f.endswith(('.py', '.js')) for f in root_files):
-            # Recursively search for a folder containing .py or .js
             for root, dirs, files in os.walk(temp_dir):
-                # Ignore system/hidden folders like __MACOSX or .git
                 dirs[:] = [d for d in dirs if not d.startswith('.') and not d.startswith('__')]
-                
                 if any(f.endswith(('.py', '.js')) for f in files):
                     target_dir = root
                     break
         
-        # If the script is in a subdirectory, move everything up to temp_dir
         if target_dir != temp_dir:
             logger.info(f"Flattening extracted files from {target_dir} to {temp_dir}")
             for item in os.listdir(target_dir):
                 s = os.path.join(target_dir, item)
                 d = os.path.join(temp_dir, item)
-                # Overwrite if exists (shouldn't happen often in this temp context)
                 if os.path.exists(d):
                     if os.path.isdir(d): shutil.rmtree(d)
                     else: os.remove(d)
                 shutil.move(s, d)
-            # Refresh list after flattening
             extracted_items = os.listdir(temp_dir)
         else:
             extracted_items = root_files
-        # --- END FIX ---
 
         py_files = [f for f in extracted_items if f.endswith('.py')]
         js_files = [f for f in extracted_items if f.endswith('.js')]
@@ -1212,7 +1277,7 @@ def handle_zip_file(downloaded_file_content, file_name_zip, message):
         logger.info(f"Moving extracted files from {temp_dir} to {user_folder}")
         moved_count = 0
         for item_name in os.listdir(temp_dir):
-            if item_name == file_name_zip: continue # Don't move the zip file itself if it's there
+            if item_name == file_name_zip: continue
             src_path = os.path.join(temp_dir, item_name)
             dest_path = os.path.join(user_folder, item_name)
             if os.path.isdir(dest_path): shutil.rmtree(dest_path)
@@ -1272,7 +1337,6 @@ def send_to_process_init(message):
     user_id = message.from_user.id
     chat_id = message.chat.id
     
-    # Get user's running processes
     user_running_scripts = []
     for script_key, script_info in bot_scripts.items():
         script_owner_id = script_info['script_owner_id']
@@ -1306,12 +1370,10 @@ def process_send_command(message, script_key):
     try:
         process = script_info['process']
         if process and process.poll() is None:
-            # Send command to process stdin
             process.stdin.write(command_text + '\n')
             process.stdin.flush()
             bot.reply_to(message, f"✅ Command sent to `{script_info['file_name']}`:\n`{command_text}`", parse_mode='Markdown')
             
-            # Wait a bit and check if process is still running
             time.sleep(1)
             if process.poll() is not None:
                 bot.reply_to(message, f"⚠️ Script `{script_info['file_name']}` stopped after receiving command.")
@@ -1328,7 +1390,6 @@ def view_all_logs(message):
     
     user_logs = []
     
-    # Get user's folder and all log files
     user_folder = get_user_folder(user_id)
     if os.path.exists(user_folder):
         for file in os.listdir(user_folder):
@@ -1354,7 +1415,7 @@ def send_log_file(message, log_path, log_filename):
     """Send log file as document"""
     try:
         file_size = os.path.getsize(log_path)
-        if file_size > 50 * 1024 * 1024:  # 50MB limit
+        if file_size > 50 * 1024 * 1024:
             bot.reply_to(message, f"❌ Log file too large ({file_size/1024/1024:.1f} MB). Maximum 50MB.")
             return
         
@@ -1369,7 +1430,6 @@ def send_log_file(message, log_path, log_filename):
 def _logic_send_welcome(message):
     user_id = message.from_user.id
     chat_id = message.chat.id
-    # Check if the message is in a group or private chat
     is_group = message.chat.type in ['group', 'supergroup']
     
     user_name = message.from_user.first_name
@@ -1424,28 +1484,22 @@ def _logic_send_welcome(message):
     inline_markup = create_main_menu_inline(user_id)
 
     try:
-        # Don't send user profile photo into the group chat to avoid spam
         if photo_file_id and not is_group: bot.send_photo(chat_id, photo_file_id)
         
-        # Always attach Inline Menu to the video/text
         if menu_video_id:
             try:
                 bot.send_video(chat_id, menu_video_id, caption=welcome_msg_text, reply_markup=inline_markup, parse_mode='Markdown')
-                if not is_group: # ONLY send big reply keyboard in DMs
-                    bot.send_message(chat_id, "Navigating via Reply Keyboard:", reply_markup=main_reply_markup)
+                if not is_group: bot.send_message(chat_id, "Navigating via Reply Keyboard:", reply_markup=main_reply_markup)
             except telebot.apihelper.ApiTelegramException:
                 try: 
                     bot.send_animation(chat_id, menu_video_id, caption=welcome_msg_text, reply_markup=inline_markup, parse_mode='Markdown')
-                    if not is_group: 
-                        bot.send_message(chat_id, "Navigating via Reply Keyboard:", reply_markup=main_reply_markup)
+                    if not is_group: bot.send_message(chat_id, "Navigating via Reply Keyboard:", reply_markup=main_reply_markup)
                 except:
                     bot.send_message(chat_id, welcome_msg_text, reply_markup=inline_markup, parse_mode='Markdown')
-                    if not is_group: 
-                        bot.send_message(chat_id, "Navigating via Reply Keyboard:", reply_markup=main_reply_markup)
+                    if not is_group: bot.send_message(chat_id, "Navigating via Reply Keyboard:", reply_markup=main_reply_markup)
         else:
             bot.send_message(chat_id, welcome_msg_text, reply_markup=inline_markup, parse_mode='Markdown')
-            if not is_group: 
-                bot.send_message(chat_id, "Navigating via Reply Keyboard:", reply_markup=main_reply_markup)
+            if not is_group: bot.send_message(chat_id, "Navigating via Reply Keyboard:", reply_markup=main_reply_markup)
             
     except Exception as e:
         logger.error(f"Error sending welcome to {user_id}: {e}", exc_info=True)
@@ -1741,7 +1795,6 @@ def handle_file_upload_doc(message):
         file_info_tg_doc = bot.get_file(doc.file_id)
         downloaded_file_content = bot.download_file(file_info_tg_doc.file_path)
         
-        # Malware scan (except for owner)
         if user_id != OWNER_ID:
             is_safe, reason = scan_file_for_malware(downloaded_file_content, file_name, user_id)
             if not is_safe:

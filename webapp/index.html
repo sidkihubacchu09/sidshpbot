@@ -18,7 +18,6 @@
     <div class="app-container" id="main-app">
 
         <div id="view-deploy" class="view-section active">
-            
             <div class="glass-panel" id="step1-script">
                 <div class="panel-header"><h2 class="gradient-text">Deploy Bot</h2></div>
                 <p class="status-text">Enter credentials and write/upload your Python script.</p>
@@ -77,7 +76,10 @@
 
         <div id="view-files" class="view-section hidden">
             <div class="glass-panel">
-                <div class="panel-header"><h2>Your Bots</h2></div>
+                <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>Your Bots</h2>
+                    <span style="font-size: 0.8rem; background: rgba(39, 201, 63, 0.2); color: #27c93f; padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(39, 201, 63, 0.4); font-weight: bold;">🟢 1 / 2 Running</span>
+                </div>
                 <p class="status-text">Manage your hosted userbot processes.</p>
                 
                 <div class="file-item stagger-1">
@@ -123,18 +125,34 @@
                     </div>
                     <span class="close-btn" onclick="terminal.close()">✖</span>
                 </div>
-                <div class="terminal-body" id="terminal-output">
-                    </div>
+                <div class="terminal-body" id="terminal-output"></div>
             </div>
         </div>
 
         <div id="view-settings" class="view-section hidden">
-            <div class="glass-panel stagger-1">
+            <div class="glass-panel stagger-1" style="margin-bottom: 20px;">
+                <div class="panel-header"><h2>Account Dashboard</h2></div>
+                <div style="background: rgba(0, 0, 0, 0.4); padding: 15px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); margin-top: 15px; text-align: left;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span style="color: #ccc;">Account Status:</span>
+                        <span style="color: #fff; font-weight: bold;">Standard (Free)</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                        <span style="color: #ccc;">Wallet Balance:</span>
+                        <span style="color: #27c93f; font-weight: bold;">$0.00</span>
+                    </div>
+                    <button class="primary-btn btn-animate" style="width: 100%; background: linear-gradient(90deg, #ffd700, #ff8c00); color: #000; font-weight: bold; border: none; box-shadow: 0 4px 15px rgba(255, 140, 0, 0.3);">
+                        💎 Upgrade to Premium
+                    </button>
+                </div>
+            </div>
+
+            <div class="glass-panel stagger-2">
                 <div class="panel-header"><h2>Preferences</h2></div>
                 <div class="mt-20">
                     <p style="margin-bottom: 10px; font-size: 0.9rem; color: #ccc;">Background Video URL</p>
                     <input type="text" id="video-url-input" class="glass-input" placeholder="https://.../video.mp4" value="https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4">
-                    <button class="secondary-btn btn-animate" onclick="appSettings.updateVideo()">Update Background</button>
+                    <button class="secondary-btn btn-animate" onclick="updateBackgroundFromSettings()">Update Background</button>
                 </div>
             </div>
         </div>
@@ -144,7 +162,7 @@
                 <div class="panel-header" style="justify-content: center;"><h2 class="gradient-text">Admin Portal</h2></div>
                 <p class="status-text">Restricted Area. Authentication required.</p>
                 <input type="password" id="adminPassInput" class="glass-input text-center" placeholder="Admin Password">
-                <button class="primary-btn btn-animate" id="btn-admin-login" onclick="adminFlow.login()">
+                <button class="primary-btn btn-animate" id="btn-admin-login" onclick="verifyAdminPassword()">
                     <span class="btn-text">Access Core</span>
                     <div class="spinner"></div>
                 </button>
@@ -154,9 +172,9 @@
                 <div class="panel-header">
                     <h2 class="gradient-text">Server Core</h2>
                 </div>
-                <p class="status-text" style="color: #27c93f;"><span class="pulse status-dot green" style="display:inline-block; font-size:0.8rem; margin-right:5px;">●</span>Node is online (Ping: 12ms)</p>
+                <p class="status-text" id="server-status-text" style="color: #27c93f;"><span class="pulse status-dot green" style="display:inline-block; font-size:0.8rem; margin-right:5px;">●</span>Node is online (Ping: 12ms)</p>
                 
-                <div class="admin-stats-grid">
+                <div class="admin-stats-grid" style="margin-top: 15px;">
                     <div class="stat-card">
                         <div class="stat-value">14</div>
                         <div class="stat-label">Active Bots</div>
@@ -165,8 +183,33 @@
                         <div class="stat-value">89%</div>
                         <div class="stat-label">CPU Load</div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-value">1,204</div>
+                        <div class="stat-label">Total Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" style="color: #27c93f;">$345.00</div>
+                        <div class="stat-label">Payments (24h)</div>
+                    </div>
                 </div>
-                <button class="secondary-btn admin-logout-btn btn-animate" onclick="adminFlow.logout()">Secure Logout</button>
+
+                <div style="background: rgba(0, 0, 0, 0.4); padding: 15px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); margin-top: 15px; text-align: left;">
+                    <p style="color: #fff; margin-bottom: 10px; font-weight: bold; font-size: 0.9rem;">Server Power Switch</p>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="action-btn" style="flex: 1; color: #27c93f; border-color: rgba(39,201,63,0.4); background: rgba(39,201,63,0.1);" onclick="toggleServerPower(true)">▶ Power ON</button>
+                        <button class="action-btn danger" style="flex: 1;" onclick="toggleServerPower(false)">⏹ Power OFF</button>
+                    </div>
+                </div>
+
+                <div style="background: rgba(0, 0, 0, 0.4); padding: 15px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); margin-top: 15px; margin-bottom: 15px; text-align: left;">
+                    <p style="color: #fff; margin-bottom: 10px; font-weight: bold; font-size: 0.9rem;">Change Web Background Video</p>
+                    <input type="text" id="admin-video-url-input" class="glass-input" style="margin-bottom: 10px;" placeholder="https://.../video.mp4" value="https://cdn.pixabay.com/video/2020/05/25/40131-424785461_large.mp4">
+                    <button class="secondary-btn btn-animate" style="width: 100%; border-color: rgba(255,255,255,0.2);" onclick="updateBackgroundFromAdmin()">
+                        🎬 Update Background Video
+                    </button>
+                </div>
+
+                <button class="secondary-btn admin-logout-btn btn-animate" onclick="logoutAdmin()">Secure Logout</button>
             </div>
         </div>
 
@@ -186,6 +229,63 @@
             <span class="nav-icon">🛡️</span><span class="nav-label">Admin</span>
         </div>
     </nav>
+
+    <script>
+        // Password Protection for sid999
+        function verifyAdminPassword() {
+            const pass = document.getElementById('adminPassInput').value;
+            if (pass === 'sid999') {
+                document.getElementById('admin-login-panel').classList.add('hidden');
+                document.getElementById('admin-dash-panel').classList.remove('hidden');
+                document.getElementById('adminPassInput').value = '';
+            } else {
+                alert('Access Denied. Incorrect Admin Password.');
+            }
+        }
+
+        function logoutAdmin() {
+            document.getElementById('admin-dash-panel').classList.add('hidden');
+            document.getElementById('admin-login-panel').classList.remove('hidden');
+        }
+
+        // Server Power toggles
+        function toggleServerPower(turnOn) {
+            const statusText = document.getElementById('server-status-text');
+            if (turnOn) {
+                statusText.style.color = '#27c93f';
+                statusText.innerHTML = '<span class="pulse status-dot green" style="display:inline-block; font-size:0.8rem; margin-right:5px;">●</span>Node is online (Ping: 12ms)';
+            } else {
+                statusText.style.color = '#ff5f56';
+                statusText.innerHTML = '<span class="status-dot red" style="display:inline-block; font-size:0.8rem; margin-right:5px;">●</span>Node is offline';
+            }
+        }
+
+        // Instant background video synchronized updating
+        function changeBackgroundEngine(url) {
+            const video = document.getElementById('bg-video');
+            if (video && url) {
+                video.src = url;
+                video.load();
+                video.play().catch(e => console.log("Video source modified successfully."));
+            }
+        }
+
+        function updateBackgroundFromAdmin() {
+            const url = document.getElementById('admin-video-url-input').value;
+            changeBackgroundEngine(url);
+            
+            const settingsInput = document.getElementById('video-url-input');
+            if (settingsInput) settingsInput.value = url;
+        }
+
+        function updateBackgroundFromSettings() {
+            const url = document.getElementById('video-url-input').value;
+            changeBackgroundEngine(url);
+            
+            const adminInput = document.getElementById('admin-video-url-input');
+            if (adminInput) adminInput.value = url;
+        }
+    </script>
 
     <script src="js/script.js"></script>
 </body>

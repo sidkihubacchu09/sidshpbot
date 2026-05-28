@@ -1,8 +1,8 @@
 // Local Storage Database Initialization Core
 if (!localStorage.getItem('sid_initialized')) {
     const defaultBots = [
-        { id: 'bot_1', name: 'auto_reply.py', status: 'Running', uptime: '4h 12m', ram: '12MB' },
-        { id: 'bot_2', name: 'scraper_bot.py', status: 'Stopped', uptime: '0m', ram: '0MB' }
+        { id: 'bot_1', name: 'auto_reply.py', status: 'Running', uptime: '4h 12m', ram: '12MB', logs: ["[SYS] Pre-compiled module loaded.", "[INFO] Listening for events..."] },
+        { id: 'bot_2', name: 'scraper_bot.py', status: 'Stopped', uptime: '0m', ram: '0MB', logs: ["[SYS] Process terminated by user request."] }
     ];
     localStorage.setItem('sid_bots', JSON.stringify(defaultBots));
     localStorage.setItem('sid_wallet', '0.00');
@@ -39,9 +39,9 @@ const nav = {
     }
 };
 
-// Deployment Pipeline Framework
+// Deployment Pipeline & Real-Time Validation Environment
 const deployFlow = {
-    tempData: { phone: '', script: '', fileName: 'main.py' },
+    tempData: { phone: '', script: '', fileName: 'main.py', runtimeGeneratedOTP: null },
 
     handleFileUpload: function(event) {
         const file = event.target.files[0];
@@ -58,9 +58,15 @@ const deployFlow = {
     },
 
     nextToOTP: function() {
-        const phone = document.getElementById('phoneInput').value;
-        if (!phone) {
-            alert('Please enter a valid phone number setup matrix configuration.');
+        const phone = document.getElementById('phoneInput').value.trim();
+        const scriptBody = document.getElementById('scriptInput').value.trim();
+
+        if (!phone || phone.length < 7) {
+            alert('❌ Deployment Failed: Invalid international phone format routing context.');
+            return;
+        }
+        if (!scriptBody) {
+            alert('❌ Compilation Failed: Cannot deploy an unallocated or empty script environment.');
             return;
         }
 
@@ -70,45 +76,97 @@ const deployFlow = {
         setTimeout(() => {
             btn.classList.remove('loading');
             this.tempData.phone = phone;
-            this.tempData.script = document.getElementById('scriptInput').value;
+            this.tempData.script = scriptBody;
 
-            document.getElementById('otp-phone-display').innerText = `We sent a login code to ${phone}`;
+            // Generate real-time randomized verification secure token
+            this.tempData.runtimeGeneratedOTP = Math.floor(10000 + Math.random() * 90000).toString();
+            
+            // Dispatch systemic simulated network notification alert
+            alert(`[TELEGRAM NETWORK INTERFACE]\nIncoming authorization packet requested for node link.\nYour verification code is: ${this.tempData.runtimeGeneratedOTP}`);
+
+            document.getElementById('otp-phone-display').innerText = `We sent a 5-digit login code to ${phone}`;
             document.getElementById('step1-script').classList.add('hidden');
             document.getElementById('step2-otp').classList.remove('hidden');
         }, 1500);
     },
 
     nextToPassword: function() {
-        const otp = document.getElementById('otpInput').value;
-        if (!otp) {
-            alert('Verification code matrix cannot remain blank.');
+        const inputOtp = document.getElementById('otpInput').value.trim();
+        const btn = document.getElementById('btn-otp');
+
+        if (!inputOtp) {
+            alert('Please enter your 5-digit network code packet.');
             return;
         }
-        
-        const btn = document.getElementById('btn-otp');
-        btn.classList.add('loading');
 
-        setTimeout(() => {
-            btn.classList.remove('loading');
-            document.getElementById('step2-otp').classList.add('hidden');
-            document.getElementById('step3-password').classList.remove('hidden');
-        }, 1200);
-    },
-
-    finalize: function() {
-        const btn = document.getElementById('btn-pass');
         btn.classList.add('loading');
 
         setTimeout(() => {
             btn.classList.remove('loading');
             
+            // Real-time runtime value verification check
+            if (inputOtp === this.tempData.runtimeGeneratedOTP) {
+                document.getElementById('step2-otp').classList.add('hidden');
+                document.getElementById('step3-password').classList.remove('hidden');
+                document.getElementById('otpInput').value = ''; // Flush validation cache
+            } else {
+                alert('❌ Access Denied: Invalid OTP signature credentials provided.');
+            }
+        }, 1200);
+    },
+
+    finalize: function() {
+        const passwordInput = document.getElementById('passwordInput').value;
+        const btn = document.getElementById('btn-pass');
+
+        btn.classList.add('loading');
+
+        setTimeout(() => {
+            btn.classList.remove('loading');
+            
+            // Real-Time Dynamic Source Parsing Compiler Check
+            const runtimeLogs = [];
+            runtimeLogs.push(`[SYS] Initializing container sandbox architecture for node upload...`);
+            runtimeLogs.push(`[SYS] Parsing local binary source context: "${this.tempData.fileName}"`);
+
+            // Scan code string payload directly to map dynamic dependencies
+            const importedModules = [];
+            if (this.tempData.script.includes('telethon')) importedModules.push('telethon');
+            if (this.tempData.script.includes('pyrogram')) importedModules.push('pyrogram');
+            if (this.tempData.script.includes('requests')) importedModules.push('requests');
+            if (this.tempData.script.includes('os')) importedModules.push('os');
+
+            if (importedModules.length > 0) {
+                runtimeLogs.push(`[PIP] Dependencies mapped: [${importedModules.join(', ')}]. Resolving environments...`);
+            } else {
+                runtimeLogs.push(`[WARN] No standard asynchronous network packages declared. Running core environment.`);
+            }
+
+            // Real-time logical syntax integrity scanner simulation
+            if (this.tempData.script.includes('def') && !this.tempData.script.includes(':')) {
+                runtimeLogs.push(`[CRITICAL] SyntaxError: Expected ':' block closure in function structures.`);
+                alert('❌ Deployment Matrix Broken: Local compiler returned code SyntaxError structural faults.');
+                return;
+            }
+
+            runtimeLogs.push(`[SUCCESS] Virtual container pipeline mapped cleanly. Process state online.`);
+            runtimeLogs.push(`[LIVE] Execution log outputs connected successfully:\n----------------------`);
+            
+            // Slice the actual user script content to create a simulated operational preview
+            const linePreviews = this.tempData.script.split('\n').filter(l => l.trim() !== '');
+            linePreviews.slice(0, 3).forEach(line => {
+                runtimeLogs.push(`[RUNNING] > ${line.substring(0, 50)}`);
+            });
+
+            // Write verified asset build context out to LocalStorage persistence
             const currentBots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
             currentBots.push({
                 id: 'bot_' + Date.now(),
                 name: this.tempData.fileName,
                 status: 'Running',
                 uptime: '1m',
-                ram: '14MB'
+                ram: `${Math.floor(8 + Math.random() * 8)}MB`,
+                logs: runtimeLogs
             });
             localStorage.setItem('sid_bots', JSON.stringify(currentBots));
 
@@ -128,6 +186,7 @@ const deployFlow = {
         document.getElementById('otpInput').value = '';
         document.getElementById('passwordInput').value = '';
         document.getElementById('filename-display').innerText = 'main.py';
+        this.tempData.runtimeGeneratedOTP = null;
         
         document.getElementById('step4-success').classList.add('hidden');
         document.getElementById('step1-script').classList.remove('hidden');
@@ -168,7 +227,7 @@ function renderBotDashboard() {
                 <span class="status-dot ${isRunning ? 'green pulse' : 'red'}">●</span>
             </div>
             <div class="file-actions">
-                <button class="action-btn" onclick="terminal.open('${bot.name}')">📝 Logs</button>
+                <button class="action-btn" onclick="terminal.open('${bot.id}')">📝 Logs</button>
                 <button class="action-btn" onclick="toggleBotState('${bot.id}')" style="${!isRunning ? 'color: #27c93f; border-color: rgba(39,201,63,0.3);' : ''}">
                     ${isRunning ? '🔄 Restart' : '▶ Start'}
                 </button>
@@ -188,7 +247,9 @@ function toggleBotState(botId) {
             const running = b.status === 'Running';
             b.status = running ? 'Stopped' : 'Running';
             b.uptime = running ? '0m' : '1m';
-            b.ram = running ? '0MB' : '12MB';
+            b.ram = running ? '0MB' : `${Math.floor(10 + Math.random() * 6)}MB`;
+            if (!b.logs) b.logs = [];
+            b.logs.push(`[SYS-EVENT] Application state manually shifted to: ${b.status}`);
         }
         return b;
     });
@@ -213,33 +274,57 @@ function deleteBotAsset(botId) {
 // Live Logging Diagnostic Terminal Engine
 let logInterval = null;
 const terminal = {
-    open: function(botName) {
+    open: function(botId) {
+        const bots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
+        const currentBot = bots.find(b => b.id === botId);
+        if (!currentBot) return;
+
         const modal = document.getElementById('terminal-modal');
-        document.getElementById('terminal-bot-name').innerText = `logs::${botName}`;
+        document.getElementById('terminal-bot-name').innerText = `logs::${currentBot.name}`;
         const output = document.getElementById('terminal-output');
         output.innerHTML = '';
         modal.classList.remove('hidden');
 
-        const initialLogs = [
-            `[SYS-INFO] Registering process environment thread for: ${botName}...`,
-            `[SYS-INFO] Virtual memory framework map verified successfully.`,
-            `[SUCCESS] Session database handshakes authorized. Loading telethon.`,
-            `[LIVE] Listening for dynamic incoming system gateway events...`
-        ];
+        // Load historical or setup trace log matrices
+        if (currentBot.logs && currentBot.logs.length > 0) {
+            currentBot.logs.forEach(log => {
+                output.innerHTML += `<div class="log-line">${log}</div>`;
+            });
+        } else {
+            output.innerHTML += `<div class="log-line">[SYS-INFO] Fetching historical runtime stack track lines...</div>`;
+        }
 
-        initialLogs.forEach(log => output.innerHTML += `<div class="log-line">${log}</div>`);
+        output.scrollTop = output.scrollHeight;
 
-        logInterval = setInterval(() => {
-            const updates = [
-                `[METRIC] Thread check OK. Latency ping rate: 11ms.`,
-                `[DEBUG] State cache successfully flushed to dynamic container.`,
-                `[INFO] Inbound filter matrices processed successfully.`,
-                `[PROTECTION] Anti-flood delay parameters operating cleanly.`
-            ];
-            const randomEntry = updates[Math.floor(Math.random() * updates.length)];
-            output.innerHTML += `<div class="log-line">${randomEntry}</div>`;
+        // If active, stream continuous running server framework events
+        if (currentBot.status === 'Running') {
+            logInterval = setInterval(() => {
+                const liveUpdates = [
+                    `[METRIC] Framework tick validated. Latency core ping: ${Math.floor(8 + Math.random() * 10)}ms.`,
+                    `[DEBUG] Asynchronous background worker tasks resolved. Memory flush execution clean.`,
+                    `[INFO] Secure API event socket loop actively waiting for incoming telemetry data channels...`,
+                    `[SYS-METRIC] Container tracking status: Active loop operational.`
+                ];
+                const selectedEntry = liveUpdates[Math.floor(Math.random() * liveUpdates.length)];
+                output.innerHTML += `<div class="log-line">${selectedEntry}</div>`;
+                output.scrollTop = output.scrollHeight;
+
+                // Persist the newly generated stream line data to storage records
+                let freshBotsList = JSON.parse(localStorage.getItem('sid_bots') || '[]');
+                freshBotsList = freshBotsList.map(b => {
+                    if (b.id === botId) {
+                        if (!b.logs) b.logs = [];
+                        b.logs.push(selectedEntry);
+                    }
+                    return b;
+                });
+                localStorage.setItem('sid_bots', JSON.stringify(freshBotsList));
+
+            }, 2500);
+        } else {
+            output.innerHTML += `<div class="log-line" style="color: #ff5f56;">[OFFLINE] Process streaming paused. Start bot to restore standard real-time output trackers.</div>`;
             output.scrollTop = output.scrollHeight;
-        }, 2000);
+        }
     },
     close: function() {
         document.getElementById('terminal-modal').classList.add('hidden');

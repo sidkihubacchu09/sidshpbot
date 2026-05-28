@@ -1,160 +1,200 @@
-// Initialize Telegram Web App API
 const tg = window.Telegram.WebApp;
-
-// Expand WebApp to full height on open
 tg.expand();
 
-// Let TG handle theme colors (Optional, as our CSS overrides mostly with glass theme)
-tg.ready();
-
-// Utility for providing Haptic Feedback (Phone Vibration)
+// Utility for providing Haptic Feedback
 const haptic = {
     tap: () => tg.HapticFeedback.impactOccurred('light'),
     success: () => tg.HapticFeedback.notificationOccurred('success'),
     error: () => tg.HapticFeedback.notificationOccurred('error')
 };
 
-// --- Navigation Controller ---
+// Global App State
+let IS_WEB_ENABLED = true; 
+
+// Initial check to see if Web is enabled
+window.onload = async () => {
+    try {
+        let res = await fetch('/api/public/status');
+        let data = await res.json();
+        IS_WEB_ENABLED = data.web_enabled;
+        
+        // Load custom video if set
+        if(data.video_bg) {
+            document.getElementById('bg-video').src = data.video_bg;
+        }
+
+        if (!IS_WEB_ENABLED) {
+            document.getElementById('step1-script').innerHTML = `<h2 class="text-center mt-20">Maintenance</h2><p class="status-text text-center">Web deployment is currently disabled by Admin.</p>`;
+        }
+    } catch(e) {}
+};
+
 const nav = {
     switchTab: function(targetId) {
         haptic.tap();
-        
-        // Update Bottom Nav UI
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.remove('active');
-            if(item.dataset.target === targetId) {
-                item.classList.add('active');
-            }
+            if(item.dataset.target === targetId || (targetId === 'admin-login' && item.dataset.target === 'admin')) item.classList.add('active');
         });
-
-        // Hide all views, show target view
         document.querySelectorAll('.view-section').forEach(view => {
             view.classList.remove('active');
-            view.classList.add('hidden');
+            setTimeout(()=> view.classList.add('hidden'), 50);
         });
-
-        document.getElementById(`view-${targetId}`).classList.remove('hidden');
-        // Small delay to allow display:block to apply before animating opacity
-        setTimeout(() => {
-            document.getElementById(`view-${targetId}`).classList.add('active');
-        }, 10);
+        
+        let targetView = document.getElementById(`view-${targetId}`);
+        targetView.classList.remove('hidden');
+        setTimeout(() => targetView.classList.add('active'), 60);
     }
 };
 
-// --- Terminal Simulator ---
-const terminal = {
-    el: document.getElementById('terminal-output'),
-    
-    log: function(msg, type="info") {
-        const line = document.createElement('div');
-        line.className = `log-line ${type}`;
-        
-        // Add timestamp
-        const time = new Date().toLocaleTimeString('en-US', {hour12: false, hour: "numeric", minute: "numeric", second: "numeric"});
-        line.textContent = `[${time}] ${msg}`;
-        
-        this.el.appendChild(line);
-        this.el.scrollTop = this.el.scrollHeight; // Auto-scroll
-    }
-};
-
-// --- Deployment Flow Controller ---
+// --- User Deployment Flow ---
 const deployFlow = {
+    sessionPhone: "", phoneCodeHash: "",
     
     setLoading: function(btnId, isLoading) {
         const btn = document.getElementById(btnId);
-        const text = btn.querySelector('.btn-text');
-        const spin = btn.querySelector('.spinner');
+        if(isLoading) { btn.disabled = true; btn.querySelector('.btn-text').style.display='none'; btn.querySelector('.spinner').style.display='block'; } 
+        else { btn.disabled = false; btn.querySelector('.btn-text').style.display='block'; btn.querySelector('.spinner').style.display='none'; }
+    },
+    switchPanel: function(hideId, showId) { document.getElementById(hideId).classList.add('hidden'); document.getElementById(showId).classList.remove('hidden'); },
+
+    nextToOTP: async function() {
+        if(!IS_WEB_ENABLED) return tg.showAlert("Web deployment disabled.");
         
-        if(isLoading) {
-            btn.disabled = true;
-            text.style.display = 'none';
-            spin.style.display = 'block';
-        } else {
-            btn.disabled = false;
-            text.style.display = 'block';
-            spin.style.display = 'none';
-        }
-    },
-
-    switchPanel: function(hideId, showId) {
-        document.getElementById(hideId).classList.add('hidden');
-        document.getElementById(showId).classList.remove('hidden');
-    },
-
-    goBack: function(currentId, previousId) {
-        haptic.tap();
-        this.switchPanel(currentId, previousId);
-    },
-
-    // Step 1 -> 2
-    nextToOTP: function() {
+        const phone = document.getElementById('phoneInput').value;
         const script = document.getElementById('scriptInput').value;
-        if(script.trim() === "") {
-            haptic.error();
-            tg.showAlert("Script cannot be empty!");
-            return;
-        }
+        if(!phone || !script) return tg.showAlert("Phone number and script are required.");
 
         haptic.tap();
         this.setLoading('btn-deploy', true);
-        terminal.log("Initializing secure container...", "system");
 
-        // Simulate API call to backend to request OTP
-        setTimeout(() => {
-            this.setLoading('btn-deploy', false);
-            this.switchPanel('step1-script', 'step2-otp');
-            terminal.log("Sent OTP request to Telegram servers.", "info");
-        }, 1500);
+        try {
+            let res = await fetch('/api/request_code', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ phone: phone, script: script })
+            });
+            let data = await res.json();
+            if (data.status === "success") {
+                this.sessionPhone = phone;
+                this.phoneCodeHash = data.phone_code_hash;
+                document.getElementById('otp-phone-display').innerText = `Code sent to ${phone}`;
+                this.switchPanel('step1-script', 'step2-otp');
+            } else tg.showAlert("Error: " + data.message);
+        } catch (err) { tg.showAlert("Network error."); }
+        this.setLoading('btn-deploy', false);
     },
 
-    // Step 2 -> 3
-    nextToPassword: function() {
+    nextToPassword: async function() {
         const otp = document.getElementById('otpInput').value;
-        if(otp.length < 5) {
-            haptic.error();
-            tg.showAlert("Please enter a valid 5-digit code.");
-            return;
-        }
+        if(!otp) return tg.showAlert("Enter OTP.");
 
         haptic.tap();
         this.setLoading('btn-otp', true);
-        terminal.log("Verifying authorization code...", "system");
 
-        // Simulate API call to submit OTP
-        setTimeout(() => {
-            this.setLoading('btn-otp', false);
-            this.switchPanel('step2-otp', 'step3-password');
-            terminal.log("2FA Challenge required. Waiting for password...", "info");
-        }, 1500);
+        try {
+            let res = await fetch('/api/verify_code', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ phone: this.sessionPhone, code: otp, phone_code_hash: this.phoneCodeHash })
+            });
+            let data = await res.json();
+            if (data.status === "success") {
+                this.switchPanel('step2-otp', 'step4-success');
+                haptic.success(); this.bootBot();
+            } else if (data.status === "password_required") {
+                this.switchPanel('step2-otp', 'step3-password');
+            } else tg.showAlert("Error: " + data.message);
+        } catch (err) { tg.showAlert("Network error."); }
+        this.setLoading('btn-otp', false);
     },
 
-    // Step 3 -> 4 (Final)
-    finalize: function() {
+    finalize: async function() {
         const pass = document.getElementById('passwordInput').value;
-        if(!pass.trim()) {
-            haptic.error();
-            tg.showAlert("Cloud password is required.");
-            return;
-        }
+        if(!pass) return tg.showAlert("Enter password.");
 
         haptic.tap();
         this.setLoading('btn-pass', true);
-        terminal.log("Decrypting session with Cloud Password...", "system");
 
-        // Simulate API call to finish login and boot bot
-        setTimeout(() => {
-            this.setLoading('btn-pass', false);
-            this.switchPanel('step3-password', 'step4-success');
+        try {
+            let res = await fetch('/api/verify_password', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ phone: this.sessionPhone, password: pass })
+            });
+            let data = await res.json();
+            if (data.status === "success") {
+                this.switchPanel('step3-password', 'step4-success');
+                haptic.success(); this.bootBot();
+            } else tg.showAlert("Error: " + data.message);
+        } catch (err) { tg.showAlert("Network error."); }
+        this.setLoading('btn-pass', false);
+    },
+
+    bootBot: async function() {
+        await fetch('/api/start_bot', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ phone: this.sessionPhone }) });
+    }
+};
+
+// --- Admin Flow ---
+const adminFlow = {
+    setLoading: function(isLoading) {
+        const btn = document.getElementById('btn-admin-login');
+        if(isLoading) { btn.disabled = true; btn.querySelector('.btn-text').style.display='none'; btn.querySelector('.spinner').style.display='block'; } 
+        else { btn.disabled = false; btn.querySelector('.btn-text').style.display='block'; btn.querySelector('.spinner').style.display='none'; }
+    },
+
+    login: async function() {
+        const pass = document.getElementById('adminPassInput').value;
+        if(pass !== "sid999") { haptic.error(); return tg.showAlert("Incorrect Admin Password!"); }
+        
+        haptic.tap();
+        this.setLoading(true);
+        
+        // Fetch Admin Stats
+        try {
+            let start = Date.now();
+            let res = await fetch('/api/admin/stats', { headers: {'Authorization': 'sid999'} });
+            let ping = Date.now() - start;
+            let data = await res.json();
             
+            document.getElementById('server-ping').innerText = `Ping: ${ping}ms`;
+            document.getElementById('stat-users').innerText = data.active_users;
+            document.getElementById('stat-scripts').innerText = data.running_bots;
+            document.getElementById('toggle-web').checked = data.web_enabled;
+            
+            document.getElementById('view-admin-login').classList.add('hidden');
+            document.getElementById('view-admin-dash').classList.remove('hidden');
             haptic.success();
-            terminal.log("Session verified successfully!", "success");
-            terminal.log("Booting UserBot Core...", "info");
-            
-            setTimeout(() => {
-                terminal.log("UserBot is now ONLINE and listening to events.", "success");
-            }, 1000);
+        } catch(e) { tg.showAlert("Failed to connect to backend."); }
+        this.setLoading(false);
+    },
 
-        }, 2000);
+    toggleWeb: async function() {
+        let isEnabled = document.getElementById('toggle-web').checked;
+        await fetch('/api/admin/toggle_web', { 
+            method: 'POST', headers: {'Authorization': 'sid999', 'Content-Type': 'application/json'},
+            body: JSON.stringify({ state: isEnabled })
+        });
+        haptic.tap();
+    },
+
+    setVideoBG: async function() {
+        let url = document.getElementById('video-url-input').value;
+        if(!url) return;
+        await fetch('/api/admin/set_bg', { 
+            method: 'POST', headers: {'Authorization': 'sid999', 'Content-Type': 'application/json'},
+            body: JSON.stringify({ url: url })
+        });
+        document.getElementById('bg-video').src = url;
+        tg.showAlert("Background updated!");
+        haptic.success();
+    },
+
+    fetchFiles: async function() {
+        try {
+            let res = await fetch('/api/admin/files', { headers: {'Authorization': 'sid999'} });
+            let data = await res.json();
+            let list = document.getElementById('admin-files-list');
+            list.innerHTML = data.files.map(f => `<div>📄 ${f}</div>`).join('');
+            list.classList.remove('hidden');
+        } catch(e) { tg.showAlert("Error fetching files."); }
     }
 };

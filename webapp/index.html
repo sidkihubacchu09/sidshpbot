@@ -3,111 +3,174 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enterprise Bot Node Controller</title>
+    <title>SidHosting Premium Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div class="glass-nav">
-        <div class="nav-item active" onclick="nav.switchTab('view-deploy', this)">🚀 Deploy Engine</div>
-        <div class="nav-item" onclick="nav.switchTab('view-files', this)">🗄️ Dashboard Threads</div>
-        <div class="nav-item" onclick="nav.switchTab('view-settings', this)">⚙️ Control Panel</div>
-    </div>
+    <div class="background-decor bg-circle-1"></div>
+    <div class="background-decor bg-circle-2"></div>
 
-    <main class="main-workspace">
+    <div class="dashboard-container">
         
-        <div id="view-deploy" class="view-section">
-            <h2>Deploy Script Environment</h2>
-            <div class="divider"></div>
+        <aside class="sidebar">
+            <div class="brand">
+                <i class="fa-solid fa-robot logo-icon"></i>
+                <h2>SidHosting <span>v2.0</span></h2>
+            </div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active"><i class="fa-solid fa-chart-pie"></i> Overview</a>
+                <a href="#" class="nav-item"><i class="fa-solid fa-folder-open"></i> Running Files</a>
+                <a href="#" class="nav-item admin-only"><i class="fa-solid fa-user-shield"></i> Admin Panel</a>
+                <a href="#" class="nav-item"><i class="fa-solid fa-gears"></i> Settings</a>
+            </nav>
+            <div class="sidebar-footer">
+                <p>Logged in as <strong id="user-role">Owner</strong></p>
+            </div>
+        </aside>
 
-            <div id="step1-script" class="step-card">
-                <h3>Step 1: Resource Payload Allocator</h3>
-                <div class="input-group">
-                    <label>Upload Native Code File:</label>
-                    <input type="file" accept=".py,.txt" onchange="deployFlow.handleFileUpload(event)">
+        <main class="main-content">
+            
+            <header class="top-bar">
+                <div class="welcome-text">
+                    <h1>Premium Dashboard</h1>
+                    <p>Monitor your hosted scripts and server runtime instances</p>
+                </div>
+                <div class="user-profile">
+                    <span class="premium-badge"><i class="fa-solid fa-crown"></i> Premium Account</span>
+                    <div class="avatar">S9</div>
+                </div>
+            </header>
+
+            <section class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fa-solid fa-microchip"></i></div>
+                    <div class="metric-info">
+                        <h3>Active Scripts</h3>
+                        <p class="metric-value" id="active-count">3 Running</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                    <div class="metric-info">
+                        <h3>Bot Lock Status</h3>
+                        <p class="metric-value status-secure">Unlocked</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon"><i class="fa-solid fa-server"></i></div>
+                    <div class="metric-info">
+                        <h3>Allowed Slots</h3>
+                        <p class="metric-value">999 Max</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="content-section">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-circle-dot live-pulse"></i> Your Running Premium Files</h2>
+                    <button class="btn btn-primary"><i class="fa-solid fa-cloud-arrow-up"></i> Upload File</button>
                 </div>
                 
-                <div class="input-group">
-                    <label>Target File Designation Name:</label>
-                    <input type="text" id="targetFileNameDisplay" value="main.py" placeholder="script_name.py">
+                <div class="files-table-wrapper">
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>File Name</th>
+                                <th>Runtime Engine</th>
+                                <th>Execution Process ID</th>
+                                <th>Uptime Status</th>
+                                <th>Actions Control</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="file-title"><i class="fa-brands fa-python py-color"></i> main_userbot.py</td>
+                                <td><span class="tag tag-py">Python 3</span></td>
+                                <td><code>PID: 14204</code></td>
+                                <td><span class="status status-running"><i class="fa-solid fa-spinner fa-spin"></i> Running</span></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-action btn-log" title="View Realtime Logs"><i class="fa-solid fa-terminal"></i></button>
+                                        <button class="btn-action btn-stop" title="Kill Process"><i class="fa-solid fa-square-stop"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="file-title"><i class="fa-brands fa-square-js js-color"></i> auto_responder.js</td>
+                                <td><span class="tag tag-js">Node.js</span></td>
+                                <td><code>PID: 9028</code></td>
+                                <td><span class="status status-running"><i class="fa-solid fa-spinner fa-spin"></i> Running</span></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-action btn-log" title="View Realtime Logs"><i class="fa-solid fa-terminal"></i></button>
+                                        <button class="btn-action btn-stop" title="Kill Process"><i class="fa-solid fa-square-stop"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
+            </section>
 
-                <div class="input-group">
-                    <label>Raw Source Execution Script Area:</label>
-                    <textarea id="scriptInput" placeholder="import time&#10;while True:&#10;    print('Userbot heartbeat active...')&#10;    time.sleep(3)"></textarea>
-                </div>
+            <div class="two-column-grid">
+                
+                <section class="content-section">
+                    <div class="section-header">
+                        <h2><i class="fa-solid fa-user-lock"></i> Admin Configuration Portal</h2>
+                    </div>
+                    <form class="premium-form" onsubmit="event.preventDefault();">
+                        <div class="form-group">
+                            <label for="admin-pass">Set New Admin Password</label>
+                            <div class="input-with-icon">
+                                <i class="fa-solid fa-key"></i>
+                                <input type="password" id="admin-pass" placeholder="Enter password (e.g., sid999)">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="admin-id-field">Assigned Administrative Client ID</label>
+                            <div class="input-with-icon">
+                                <i class="fa-solid fa-fingerprint"></i>
+                                <input type="text" id="admin-id-field" value="2119464081" readonly>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-accent"><i class="fa-solid fa-floppy-disk"></i> Apply Admin Access Credentials</button>
+                    </form>
+                </section>
 
-                <div class="input-group">
-                    <label>Telephony Phone Routing Node Address:</label>
-                    <input type="text" id="phoneInput" placeholder="+1234567890">
-                    <span class="field-desc">Enter phone matrix values associated with the background verification loop.</span>
-                </div>
-
-                <button class="primary-btn" onclick="deployFlow.nextToOTP()">Compile and Advance &raquo;</button>
+                <section class="content-section">
+                    <div class="section-header">
+                        <h2><i class="fa-solid fa-sliders"></i> Fast Action Controls</h2>
+                    </div>
+                    <div class="toggle-control-list">
+                        <div class="toggle-item">
+                            <div class="toggle-info">
+                                <h4>Global Bot Lockout State</h4>
+                                <p>Restricts file submission workflows exclusively to admins</p>
+                            </div>
+                            <label class="switch-container">
+                                <input type="checkbox">
+                                <span class="slider-button"></span>
+                            </label>
+                        </div>
+                        <div class="toggle-item">
+                            <div class="toggle-info">
+                                <h4>Force Multi-Threading Logs</h4>
+                                <p>Enables asynchronous runtime tracking for all PIDs</p>
+                            </div>
+                            <label class="switch-container">
+                                <input type="checkbox" checked>
+                                <span class="slider-button"></span>
+                            </label>
+                        </div>
+                    </div>
+                </section>
             </div>
 
-            <div id="step2-otp" class="step-card hidden">
-                <h3>Step 2: Security Verification Authorization Packet</h3>
-                <p class="section-desc">Enter network code packet identifier sent to routing cluster structure.</p>
-                <div class="input-group">
-                    <input type="text" id="otpInput" placeholder="Enter Token (e.g., 12345)">
-                </div>
-                <div class="btn-cluster">
-                    <button class="primary-btn" onclick="deployFlow.nextToPassword()">Validate Credentials &raquo;</button>
-                    <button class="action-btn" onclick="deployFlow.goBack('step2-otp', 'step1-script')">Back</button>
-                </div>
-            </div>
-
-            <div id="step3-password" class="step-card hidden">
-                <h3>Step 3: Verification Passphrase Access Confirmation</h3>
-                <p class="section-desc">Assign administrative access profile configuration passphrase to complete mounting protocol.</p>
-                <div class="input-group">
-                    <input type="password" id="passwordInput" placeholder="Profile Password">
-                </div>
-                <div class="btn-cluster">
-                    <button class="primary-btn" id="btn-pass" onclick="deployFlow.finalize()">Authorize Pipeline Provision &raquo;</button>
-                    <button class="action-btn" onclick="deployFlow.goBack('step3-password', 'step2-otp')">Back</button>
-                </div>
-            </div>
-
-            <div id="step4-success" class="step-card success-card hidden">
-                <div class="success-icon">🎉</div>
-                <h2>Environment Allocation Secure</h2>
-                <p>Script compiled cleanly and integrated straight to backend runtime processes thread pool.</p>
-                <button class="primary-btn" onclick="deployFlow.reset()">Deploy Another Asset Node</button>
-            </div>
-        </div>
-
-        <div id="view-files" class="view-section hidden">
-            <div class="view-header">
-                <h2>Hosted Cloud Processing Instances</h2>
-                <span id="bot-running-counter" class="status-badge">🟢 0 Deployed Threads Active</span>
-            </div>
-            <div class="divider"></div>
-            <div id="bots-list-container" class="dashboard-grid"></div>
-        </div>
-
-        <div id="view-settings" class="view-section hidden">
-            <h2>System Profile Configuration Controls</h2>
-            <div class="divider"></div>
-            <div class="settings-card">
-                <p>Account Status: <span id="settings-account-status" class="highlight-text">Standard (Free)</span></p>
-                <p>Network Wallet Resource Allocation: <span id="settings-wallet-balance" class="accent-text">$0.00</span></p>
-                <button class="primary-btn" id="settings-upgrade-btn" onclick="appSettings.purchasePremium()">Upgrade to Premium Pro Cluster</button>
-            </div>
-        </div>
-    </main>
-
-    <div id="terminal-modal" class="modal-backdrop hidden">
-        <div class="terminal-box">
-            <div class="terminal-header">
-                <span id="terminal-bot-name">runtime_stream::initializing...</span>
-                <span class="close-modal-btn" onclick="terminal.close()">[❌ CLOSE]</span>
-            </div>
-            <div id="terminal-output"></div>
-        </div>
+        </main>
     </div>
 
-    <script src="app.js"></script>
 </body>
 </html>

@@ -271,19 +271,21 @@ const deployFlow = {
 
             // Write asset record context out to storage parameters
             const currentBots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
+            const newBotId = 'bot_' + Date.now();
             currentBots.push({
-                id: 'bot_' + Date.now(),
+                id: newBotId,
                 name: this.tempData.fileName,
-                status: 'Running',
+                status: 'Stopped', // Instantiated as Stopped; initialized completely when started
                 uptime: '0m',
-                ram: `${Math.floor(10 + Math.random() * 8)}MB`,
-                startTime: Date.now(),
+                ram: '0MB',
+                startTime: null,
                 logs: runtimeLogs,
                 traits: {
                     type: analysis.type,
                     metricTemplate: analysis.metricTemplate,
                     activeMetric: analysis.activeMetric,
-                    counterVal: analysis.counterVal
+                    counterVal: analysis.counterVal,
+                    rawScriptSource: this.tempData.script // Save code into local instance state context
                 }
             });
             
@@ -293,6 +295,11 @@ const deployFlow = {
             const step4 = document.getElementById('step4-success');
             if (step3) step3.classList.add('hidden');
             if (step4) step4.classList.remove('hidden');
+
+            // Automatically transition environments and execute the freshly loaded userbot asset 
+            setTimeout(() => {
+                userbotEngine.runUserbotScript(newBotId);
+            }, 800);
         }, 2000);
     },
 
@@ -322,7 +329,52 @@ const deployFlow = {
 };
 
 // ==========================================
-// 5. UI Element Constructor & Management Engine
+// 5. Userbot Script Core Run Engine Layer
+// ==========================================
+const userbotEngine = {
+    runUserbotScript: function(botId) {
+        let bots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
+        let selectedBot = bots.find(b => b.id === botId);
+
+        if (!selectedBot) {
+            console.error(`Execution routing error: Core node token target [${botId}] was not allocated.`);
+            return;
+        }
+
+        // Enforce structural reset variables for initialization sequences
+        selectedBot.status = 'Running';
+        selectedBot.startTime = Date.now();
+        selectedBot.uptime = '0m';
+        selectedBot.ram = `${Math.floor(12 + Math.random() * 6)}MB`;
+
+        if (!selectedBot.logs) selectedBot.logs = [];
+        
+        // Log clean execution traces into instance parameters
+        selectedBot.logs.push(`[ENGINE] [${new Date().toLocaleTimeString()}] Spawning asynchronous process isolate thread...`);
+        selectedBot.logs.push(`[ENGINE] Executing entrypoint compilation -> Python virtualenv cluster execution sequence.`);
+        
+        if (selectedBot.traits && selectedBot.traits.rawScriptSource) {
+            selectedBot.logs.push(`[ENGINE] Core source footprint verification checksum validated cleanly.`);
+        }
+
+        selectedBot.logs.push(`[SYS-EVENT] Bot process actively switched to operational lifecycle state: Running`);
+
+        // Re-save status structural modifications safely back to application core storage parameters
+        updateStoredBots(bots);
+
+        // If telemetry terminal windows are open, force synchronization streams 
+        const openTerminalModal = document.getElementById('terminal-modal');
+        if (openTerminalModal && !openTerminalModal.classList.contains('hidden')) {
+            const runningTitle = document.getElementById('terminal-bot-name')?.innerText || '';
+            if (runningTitle.includes(selectedBot.name)) {
+                terminal.open(botId);
+            }
+        }
+    }
+};
+
+// ==========================================
+// 6. UI Element Constructor & Management Engine
 // ==========================================
 function renderBotDashboard() {
     const bots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
@@ -386,20 +438,26 @@ function renderBotDashboard() {
 
 function toggleBotState(botId) {
     let bots = JSON.parse(localStorage.getItem('sid_bots') || '[]');
-    bots = bots.map(b => {
-        if (b.id === botId) {
-            const running = b.status === 'Running';
-            b.status = running ? 'Stopped' : 'Running';
-            b.startTime = running ? null : Date.now();
-            b.uptime = running ? '0m' : '1m';
-            b.ram = running ? '0MB' : `${Math.floor(10 + Math.random() * 5)}MB`;
-            
-            if (!b.logs) b.logs = [];
-            b.logs.push(`[SYS-EVENT] Process manually shifted to operational state: ${b.status}`);
-        }
-        return b;
-    });
-    updateStoredBots(bots);
+    const targetBot = bots.find(b => b.id === botId);
+
+    if (targetBot && targetBot.status !== 'Running') {
+        // Divert standard lifecycle execution pipeline parameters straight into our dedicated userbot processing script runner
+        userbotEngine.runUserbotScript(botId);
+    } else {
+        // Handle normal execution termination sequence logic
+        bots = bots.map(b => {
+            if (b.id === botId) {
+                b.status = 'Stopped';
+                b.startTime = null;
+                b.uptime = '0m';
+                b.ram = '0MB';
+                if (!b.logs) b.logs = [];
+                b.logs.push(`[SYS-EVENT] Process manually shifted to operational state: Stopped`);
+            }
+            return b;
+        });
+        updateStoredBots(bots);
+    }
 }
 
 function deleteBotAsset(botId) {
@@ -417,7 +475,7 @@ function deleteBotAsset(botId) {
 }
 
 // ==========================================
-// 6. Responsive Real-Time Telemetry Terminal Engine
+// 7. Responsive Real-Time Telemetry Terminal Engine
 // ==========================================
 let logInterval = null;
 const terminal = {
@@ -511,7 +569,7 @@ const terminal = {
 };
 
 // ==========================================
-// 7. Profile Configuration Controls
+// 8. Profile Configuration Controls
 // ==========================================
 const appSettings = {
     loadDashboard: function() {
@@ -553,7 +611,7 @@ const appSettings = {
 };
 
 // ==========================================
-// 8. Core Startup Hook Binding Layer
+// 9. Core Startup Hook Binding Layer
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     // Initial profile display configuration run

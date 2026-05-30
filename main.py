@@ -38,7 +38,7 @@ WEBAPP_DIR = os.path.join(BASE_DIR, 'webapp')
 os.makedirs(os.path.join(WEBAPP_DIR, 'css'), exist_ok=True)
 os.makedirs(os.path.join(WEBAPP_DIR, 'js'), exist_ok=True)
 
-app = Flask('', template_folder='webapp', static_folder='webapp', static_url_path='https://sidkibuybot-production.up.railway.app/')
+app = Flask('', template_folder='webapp', static_folder='webapp', static_url_path='/')
 
 # --- App State Variables ---
 app_state = {

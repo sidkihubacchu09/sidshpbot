@@ -38,7 +38,7 @@ WEBAPP_DIR = os.path.join(BASE_DIR, 'webapp')
 os.makedirs(os.path.join(WEBAPP_DIR, 'css'), exist_ok=True)
 os.makedirs(os.path.join(WEBAPP_DIR, 'js'), exist_ok=True)
 
-app = Flask('', template_folder='webapp', static_folder='webapp', static_url_path='/')
+app = Flask('', template_folder='webapp', static_folder='webapp', static_url_path='https://sidkibuybot-production.up.railway.app/')
 
 # --- App State Variables ---
 app_state = {
@@ -189,7 +189,7 @@ def keep_alive():
 # --- End Flask Web App Server ---
 
 # --- Configuration ---
-TOKEN = '6248614957:AAGWzd37KASqv6u3OZRxt3gPaqkkdpmRNHg' 
+TOKEN = '8032494974:AAE3s6Uh0c-KdWsXDd5ZP_R6h6KixSUt-dw' 
 OWNER_ID = 2119464081
 ADMIN_ID = 2119464081
 YOUR_USERNAME = '@Xricx0' 
